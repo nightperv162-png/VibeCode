@@ -1,0 +1,20 @@
+{
+  "name": "dragon-fighter-prototype",
+  "version": "1.0.0",
+  "description": "Canvas-only Dragon Fighter voice-command prototype.",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev-server.js",
+    "build": "node scripts/build.js",
+    "test": "node --test",
+    "check": "npm test && npm run build"
+  },
+  "keywords": [
+    "canvas",
+    "prototype",
+    "dragon",
+    "voice-command"
+  ],
+  "author": "",
+  "license": "UNLICENSED"
+}
