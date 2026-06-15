@@ -23,3 +23,15 @@ export function createLogger(config = CONFIG) {
     }
   };
 }
+
+// Singleton logger instance for direct imports
+const logger = createLogger(CONFIG);
+
+/**
+ * Direct log function for use throughout the codebase.
+ * @param {string} message - Log message
+ * @param {Object} details - Optional detail object
+ */
+export function log(message, details) {
+  logger.info(message, details);
+}

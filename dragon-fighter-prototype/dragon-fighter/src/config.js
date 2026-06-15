@@ -402,6 +402,28 @@ export const CONFIG = {
     closedUtilityBonusSeconds: 1
   },
 
+  spellCasting: {
+    // Cooldown multiplier for voice-cast spells. Recommended: 1.0 (same as base).
+    voiceCooldownMultiplier: 1.0,
+    // Cooldown multiplier for button/keyboard-cast spells. Recommended: 1.5 (longer to encourage voice).
+    buttonCooldownMultiplier: 1.5,
+    // Delay before a failed voice cast can be retried, in seconds. Recommended range: 0.3-1.0.
+    voiceRetryDelaySeconds: 0.5,
+    // Global lockout after a successful voice cast before next voice input is accepted, in seconds. Recommended range: 0.05-0.3.
+    voiceGlobalLockoutSeconds: 0.1
+  },
+
+  shieldAndDamage: {
+    // Duration that a shield buff remains active before expiring, in seconds. Recommended range: 3-8.
+    shieldDurationSeconds: 5,
+    // Damage multiplier when target has no shield or block. Recommended: 1.0.
+    fullDamageMultiplier: 1.0,
+    // Rounding mode for damage calculations. Recommended: round.
+    damageRoundingMode: 'round',
+    // Rounding mode for HP changes. Recommended: round.
+    hpRoundingMode: 'round'
+  },
+
   input: {
     // Enables browser speech recognition when supported. Recommended: true for voice prototype testing.
     voiceEnabled: true,

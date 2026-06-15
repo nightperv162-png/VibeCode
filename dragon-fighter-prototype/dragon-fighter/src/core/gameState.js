@@ -8,7 +8,13 @@ function createCooldownMap() {
 }
 
 function createSpellLoadout(names, config) {
-  return names.map((name, index) => createEmptySpellSlot(index, config));
+  return names.map((name, index) => {
+    const spell = createEmptySpellSlot(index, config);
+    // Initialize spell combat properties
+    spell.cooldownRemaining = 0; // Ready from start
+    spell.baseCooldown = 2; // Default 2 second cooldown
+    return spell;
+  });
 }
 
 function createSide(id, name, element, spellNames, config) {
@@ -29,7 +35,14 @@ function createSide(id, name, element, spellNames, config) {
     latestCommand: id === CONFIG.match.aiId ? CONFIG.text.noAiCommand : CONFIG.text.noPlayerCommand,
     latestReason: '',
     lastSuccessfulAction: null,
-    defeated: false
+    defeated: false,
+    // Spell combat properties
+    shield: 0,
+    shieldExpiryTime: 0,
+    slowActive: 0,
+    utilityBonusActive: 0,
+    latestFeedback: '',
+    latestFeedbackTime: 0
   };
 }
 
@@ -104,6 +117,69 @@ export function markDefeatedSides(state, config = CONFIG) {
       side.failedLabelSeconds = config.match.minHp;
     }
   });
+}
+
+/**
+ * Regenerates energy for an actor each frame.
+ * Accounts for utility bonus if active.
+ * @param {Object} actor - The actor to regen energy for.
+ * @param {number} deltaSeconds - Time elapsed since last update.
+ * @param {Object} config - Configuration object.
+ */
+export function regenEnergy(actor, deltaSeconds, config = CONFIG) {
+  if (!actor || !config.match) {
+    return;
+  }
+
+  // Base regen rate
+  let regenPerSecond = config.match.energyRegenPerSecond;
+
+  // Add bonus regen if utility is active
+  if (actor.utilityBonusActive && actor.utilityBonusActive > 0) {
+    regenPerSecond += 2; // Bonus energy per second (configurable in future)
+  }
+
+  // Apply regen
+  const regenAmount = regenPerSecond * deltaSeconds;
+  actor.energy = Math.min(
+    config.match.maxEnergy,
+    actor.energy + regenAmount
+  );
+}
+
+/**
+ * Updates all active effect durations for an actor.
+ * @param {Object} actor - The actor to update.
+ * @param {number} deltaSeconds - Time elapsed.
+ * @param {Object} config - Configuration object.
+ */
+export function updateActorEffects(actor, deltaSeconds, config = CONFIG) {
+  if (!actor) {
+    return;
+  }
+
+  // Update shield expiry
+  if (actor.shieldExpiryTime && typeof actor.shieldExpiryTime === 'number') {
+    actor.shieldExpiryTime = Math.max(0, actor.shieldExpiryTime - deltaSeconds);
+    if (actor.shieldExpiryTime <= 0) {
+      actor.shield = 0;
+    }
+  }
+
+  // Update slow effect
+  if (actor.slowActive && typeof actor.slowActive === 'number') {
+    actor.slowActive = Math.max(0, actor.slowActive - deltaSeconds);
+  }
+
+  // Update utility bonus regen
+  if (actor.utilityBonusActive && typeof actor.utilityBonusActive === 'number') {
+    actor.utilityBonusActive = Math.max(0, actor.utilityBonusActive - deltaSeconds);
+  }
+
+  // Update latest feedback timer
+  if (actor.latestFeedbackTime && typeof actor.latestFeedbackTime === 'number') {
+    actor.latestFeedbackTime = Math.max(0, actor.latestFeedbackTime - deltaSeconds);
+  }
 }
 
 export function getVisibleStateLabel(side, config = CONFIG) {

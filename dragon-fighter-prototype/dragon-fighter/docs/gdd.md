@@ -48,21 +48,7 @@ Each player brings exactly five prepared spells into combat. A spell has:
 - Effect preview.
 - Cooldown data for the future combat phase.
 
-Pattern weight:
-
-- Light: 1-2 connections, base cost 4.
-- Standard: 3-4 connections, base cost 6.
-- Heavy: 5-6 connections, base cost 8.
-- Grand: 7+ connections, base cost 10.
-
-Pattern modifiers:
-
-- 2-3 sharp angles: 25% shield piercing.
-- 4+ sharp angles: 50% shield piercing.
-- 5+ unique points: secondary effect.
-- Closed pattern: type-specific bonus.
-- Each crossed line: +2 energy cost.
-- Any crossed line: unstable, with 25% misfire chance in future combat.
+Pattern complexity influences spell weight, energy cost, piercing, secondary effects, closed-pattern bonuses, and future misfire risk. Exact formulas and thresholds live in `tdd.md`.
 
 ## Spell Type Effects
 
@@ -78,11 +64,11 @@ Pattern modifiers:
 - Voice casting uses full prepared spell names.
 - Button casting uses the Canvas spell buttons.
 - Spells require enough energy, must be off cooldown, and only work during active match state.
-- Energy starts at 20, caps at 30, and regenerates at 1 per second during active combat.
 - Voice casts use normal spell cooldown.
 - Button casts use longer cooldown.
 - Failed voice recognition costs no energy and applies retry delay.
 - Damage priority is spell shield with piercing, then HP.
+- Exact combat values, formulas, config keys, and implementation rules live in `tdd.md`.
 
 ## Target Match Flow
 
