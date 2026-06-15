@@ -8,7 +8,7 @@ Milestone 1 builds the technical and visual shell: Canvas-only app, centralized 
 
 Milestone 2 proves the spellcraft half of the design. The player can create or generate five egg patterns, assign spell types and names, see cost/effect previews, and confirm a loadout. This ends in a testable preparation flow, which is meaningful because spell identity is one of the game's design pillars.
 
-Milestone 3 proves the core fun loop: a named spell or basic command travels through input, validation, cooldowns, energy, damage/effects, state labels, and visible feedback. This is the milestone where the game becomes playable as a duel prototype, even before the full match wrapper is complete.
+Milestone 3 proves the core fun loop: a named spell skill travels through input, validation, cooldowns, energy, damage/effects, state labels, and visible feedback. This is the milestone where the game becomes playable as a duel prototype, even before the full match wrapper is complete.
 
 Milestone 4 wraps the proven systems into a complete shareable match: countdown, timer, AI loadout and decisions, win/lose/draw, restart, diagnostics, tests, commit workflow, and GitHub Pages deployment. This is not a polish pass; it delivers the first end-to-end playable vertical slice.
 
@@ -18,13 +18,13 @@ Milestone 4 wraps the proven systems into a complete shareable match: countdown,
 
 ### Scope
 
-Create the static foundation for the prototype. The app should launch in the browser with a Canvas-only game surface, centralized config, explicit runtime states, logging hooks, and separate modules for state, input, UI, rendering, spells, combat, and AI. The preparation screen and match screen should both be visually laid out with placeholders: 9-dot egg drawing area, spell slots, type/name controls, arena, dragons, HP/energy HUD, cooldown placeholders, latest feedback, command reference, and overlay regions. No real spell creation or combat resolution is required yet.
+Create the static foundation for the prototype. The app should launch in the browser with a Canvas-only game surface, centralized config, explicit runtime states, logging hooks, and separate modules for state, input, UI, rendering, spells, combat, and AI. The preparation screen and match screen should both be visually laid out with placeholders: 9-dot egg drawing area, spell slots, type/name controls, arena, dragons, HP/energy HUD, spell cooldown placeholders, latest feedback, spell reference, and overlay regions. No real spell creation or combat resolution is required yet.
 
 ### End-User Test Checklist
 
 - Open the prototype and confirm all visible game UI is inside a single Canvas.
 - Confirm there is a preparation screen with an egg drawing area, 9-dot grid placeholder, spell type area, spell name area, pattern summary, effect preview, five spell slots, random pattern button, and confirm loadout button.
-- Confirm there is a match screen layout with both dragons, both player panels, HP bars, energy cubes, timer area, state labels, latest feedback areas, spell buttons, basic command buttons, and microphone state.
+- Confirm there is a match screen layout with both dragons, both player panels, HP bars, energy cubes, timer area, state labels, latest feedback areas, prepared spell buttons, and microphone state.
 - Confirm switching or previewing screens does not show broken layout or missing Canvas regions.
 - Confirm the HTML contains no gameplay controls, HUD, overlays, or game logic.
 - Confirm the layout still reads clearly after reload and common browser resizing.
@@ -36,7 +36,7 @@ Create the static foundation for the prototype. The app should launch in the bro
 ```text
 Implement Milestone 1 for Dragon Fighter: Egg Spell Forge using dist/docs/gdd.md, dist/docs/tdd.md, and dist/docs/plan.md as the source of truth.
 
-Scope: build the Canvas-only technical shell and static layout. Create or update the source structure around config, main entry, game loop, state machine, game state, logging, input shells, spell shells, combat shells, AI shell, Canvas UI, and renderers. Render placeholder Preparation and Match screens inside Canvas: egg drawing area, 9-dot grid, random pattern button, spell type/name areas, pattern summary, effect preview, five spell slots, confirm button, arena, dragons, HP/energy HUD, cooldown placeholders, latest feedback, spell buttons, basic command reference, microphone state, and overlay regions.
+Scope: build the Canvas-only technical shell and static layout. Create or update the source structure around config, main entry, game loop, state machine, game state, logging, input shells, spell shells, combat shells, AI shell, Canvas UI, and renderers. Render placeholder Preparation and Match screens inside Canvas: egg drawing area, 9-dot grid, random pattern button, spell type/name areas, pattern summary, effect preview, five spell slots, confirm button, arena, dragons, HP/energy HUD, spell cooldown placeholders, latest feedback, prepared spell buttons, spell reference, microphone state, and overlay regions.
 
 Follow the TDD strictly:
 - Put every tunable value in the single centralized config file.
@@ -95,15 +95,14 @@ Before reporting done, run the Milestone 2 end-user test checklist from plan.md.
 
 ### Scope
 
-Implement the playable core duel mechanic. A confirmed spell loadout should become five combat buttons and valid spoken spell names. Basic commands and prepared spells should go through one normalized input pipeline, validate match state, spend energy, start cooldowns, create effects, apply damage/heal/shield/slow/utility logic, update HP/energy, and show immediate dragon feedback. This milestone proves the main idea: custom egg spells become readable real-time dragon actions.
+Implement the playable core duel mechanic. A confirmed spell loadout should become five combat skill buttons and valid spoken spell names. Prepared spells should go through one normalized input pipeline, validate match state, spend energy, start cooldowns, create effects, apply damage/heal/shield/slow/utility logic, update HP/energy, and show immediate dragon feedback. This milestone proves the main idea: custom egg spells become readable real-time dragon skills.
 
 ### End-User Test Checklist
 
 - Start from a confirmed five-spell loadout and enter the match screen.
 - Cast each prepared spell with its Canvas spell button and confirm energy, cooldown, feedback text, state labels, and effect visuals update.
-- Use keyboard shortcuts for basic commands and confirm Attack, Defence, Block, and Skill still work through the same feedback path.
 - If voice input is available, say a full prepared spell name and confirm only complete valid names cast spells.
-- Cast an Attack spell and confirm opponent HP decreases according to spell weight, bonuses, shield, Defence, and Block rules.
+- Cast an Attack spell and confirm opponent HP decreases according to spell weight, bonuses, shield, and piercing rules.
 - Cast a Defense spell and confirm a shield appears and absorbs damage.
 - Cast a Support spell and confirm HP restores without exceeding max HP.
 - Cast a Control spell and confirm the opponent slow state is shown.
@@ -118,24 +117,23 @@ Implement the playable core duel mechanic. A confirmed spell loadout should beco
 ```text
 Implement Milestone 3 for Dragon Fighter: Egg Spell Forge using dist/docs/gdd.md, dist/docs/tdd.md, and dist/docs/plan.md as the source of truth.
 
-Scope: build the named casting and combat feedback loop. Confirmed loadouts must appear as five spell buttons in the Match screen. Keyboard, Canvas buttons, and voice where available must normalize into one casting pipeline for both basic commands and prepared spell names. Implement validation, energy spending, cooldowns, voice retry/global lockout, command active durations, spell active effects, damage priority, HP changes, healing, shields, slows, utility energy regeneration, state labels, latest feedback, and visible effect cues.
+Scope: build the named casting and combat feedback loop. Confirmed loadouts must appear as five spell buttons in the Match screen. Keyboard, Canvas buttons, and voice where available must normalize into one casting pipeline for prepared spell names. Implement validation, energy spending, cooldowns, voice retry/global lockout, spell active effects, damage priority, HP changes, healing, shields, slows, utility energy regeneration, state labels, latest feedback, and visible effect cues.
 
 Required mechanics:
-- Basic commands: Attack, Defence, Block, Skill.
 - Spell types: Attack, Defense, Support, Control, Utility.
 - Energy starts at 20, caps at 30, and regenerates at 1 per second during active match time.
 - Voice spell casts use the normal 4-second cooldown.
 - Button spell casts use the 7-second cooldown.
 - Failed voice recognition costs no energy and starts the 1-second retry delay.
 - Successful voice casts start the 0.7-second global voice lockout.
-- Damage priority is Block, then spell shield with piercing, then Defence, then HP.
+- Damage priority is spell shield with piercing, then HP.
 
 Follow the TDD strictly:
 - Keep all costs, cooldowns, durations, damage, shield, heal, slow, utility, text, color, and layout values in config.
 - Keep input mapping, casting, cooldowns, damage resolution, effects, rendering, and state updates decoupled.
 - Render every UI element and feedback cue inside Canvas.
 - Add logs for input normalization, cast success/failure, energy changes, cooldowns, effect application, damage resolution, and HP changes.
-- Add tests for command mapping, spell name mapping, energy spend/shortage/regen/clamp, cooldowns, voice retry/lockout, all five spell types, basic command damage/defense/block/skill, shield and piercing, Defence reduction, Block priority, misfire behavior with seeded randomness, and HP clamping.
+- Add tests for spell name mapping, energy spend/shortage/regen/clamp, cooldowns, voice retry/lockout, all five spell types, shield and piercing, misfire behavior with seeded randomness, and HP clamping.
 
 Before reporting done, run the Milestone 3 end-user test checklist from plan.md. Also run the automated tests, run the build/compile check, verify the local dev server is running or start it, and create a Git commit with a clear conventional commit message only after checks pass. If anything cannot run in the environment, report the exact limitation and what I should run locally.
 ```
@@ -152,8 +150,8 @@ Wrap the spell-forging and casting systems into a complete vertical slice. Add t
 
 - Create or generate five spells, confirm the loadout, and see the countdown `3`, `2`, `1`, `Fight!`.
 - Confirm combat inputs are ignored or clearly marked inactive during countdown.
-- Play a full match against the AI using basic commands and prepared spells.
-- Confirm the AI uses its own five-spell loadout and visible basic commands/spells.
+- Play a full match against the AI using prepared spells.
+- Confirm the AI uses its own five-spell loadout and visible prepared spells.
 - Confirm the AI follows energy and cooldown rules and cannot act after defeat.
 - Confirm the match ends immediately when either side reaches 0 HP.
 - Confirm simultaneous defeat uses remaining energy as the tiebreaker and draws when energy is equal.
@@ -175,10 +173,10 @@ Required match and AI rules:
 - Each match lasts 60 seconds after a 3-second countdown.
 - Both sides start with 100 HP, 20 energy, and a 30 energy cap.
 - HP cannot go below 0.
-- AI uses the same command, spell, energy, cooldown, and damage rules as the player.
+- AI uses the same spell, energy, cooldown, and damage rules as the player.
 - AI attempts an action every 2 seconds while active.
-- AI chooses only ready commands or affordable ready spells.
-- AI may defend against Skill or heavy Attack spells and may use Support below the configured HP threshold.
+- AI chooses only affordable ready spells.
+- AI may defend against heavy Attack spells and may use Support below the configured HP threshold.
 - Simultaneous defeat uses remaining energy as tiebreaker, then Draw.
 - Timer end uses HP as tiebreaker, then energy, then Draw.
 
@@ -187,7 +185,7 @@ Follow the TDD strictly:
 - Maintain zero magic numbers and Canvas-only UI.
 - Keep AI, match rules, result flow, rendering, input, and diagnostics decoupled.
 - Add logs for countdown, match start/end, AI decisions, timer expiry, result selection, restart, return to preparation, build checks, server checks, and deployment.
-- Add tests for countdown state, commands ignored outside Match, AI legal choices, AI defeated behavior, timer results, simultaneous defeat tiebreakers, restart reset, return-to-preparation reset, and result overlay data.
+- Add tests for countdown state, spells ignored outside Match, AI legal choices, AI defeated behavior, timer results, simultaneous defeat tiebreakers, restart reset, return-to-preparation reset, and result overlay data.
 
 Before reporting done, run the Milestone 4 end-user test checklist from plan.md. Also run the automated tests, run the build/compile check, verify the local dev server is running or start it, and create a Git commit with a clear conventional commit message only after checks pass. If GitHub Pages deployment is blocked by the environment, report the exact limitation and the command I should run locally.
 ```

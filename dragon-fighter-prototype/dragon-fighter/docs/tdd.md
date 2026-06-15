@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This TDD guides implementation of the **Dragon Fighter: Egg Spell Forge** prototype from `gdd.md`. The prototype is a Canvas-only 1v1 dragon duel where the player prepares five dragon-egg spells, then casts basic commands and named spells through voice or fallback buttons.
+This TDD guides implementation of the **Dragon Fighter: Egg Spell Forge** prototype from `gdd.md`. The prototype is a Canvas-only 1v1 dragon duel where the player prepares five dragon-egg spells, then casts those named spells as the main combat skills through voice or fallback buttons.
 
 The goal is a small, testable vertical slice. Keep the code clear enough for junior developers to extend and for non-coders to tune values without searching through source files.
 
@@ -29,8 +29,8 @@ Every config key must have a short natural-language comment explaining:
 Example:
 
 ```js
-// Damage dealt by the basic Attack command before shields or Defence are applied. Recommended range: 5-20.
-attackDamage: 10
+// Damage dealt by a Light Attack spell before shields are applied. Recommended range: 8-16.
+lightAttackSpellDamage: 12
 ```
 
 ### Canvas-Only Application
@@ -68,7 +68,7 @@ src/
     spellRules.js
     spellLoadout.js
   combat/
-    commands.js
+    spellCommands.js
     casting.js
     cooldowns.js
     damageResolver.js
@@ -110,7 +110,7 @@ Use explicit states:
 - **Boot:** initialize Canvas, config, assets, logging, and initial state.
 - **Preparation:** create or generate five egg spells, assign names and types, preview cost/effect.
 - **Countdown:** show `3`, `2`, `1`, `Fight!`; gameplay input is ignored or marked inactive.
-- **Match:** process commands, spells, AI, cooldowns, energy, damage, timer, and win conditions.
+- **Match:** process prepared spell skills, AI, cooldowns, energy, damage, timer, and win conditions.
 - **Pause:** freeze timers, cooldowns, and AI if pause is included.
 - **Result:** show Win, Lose, or Draw, remaining HP, remaining energy, most-used spell, and restart options.
 
@@ -127,27 +127,26 @@ Minimum state:
 - Player and AI HP.
 - Player and AI energy.
 - Player and AI five-spell loadouts.
-- Basic command cooldowns and active durations.
 - Spell cooldowns and active spell effects.
 - Shields, slows, utility buffs, and temporary modifiers.
-- Latest player command or spell feedback.
-- Latest AI command or spell feedback.
+- Latest player spell feedback.
+- Latest AI spell feedback.
 - Result status and result reason.
 - Most-used spell tracking.
 
 ## Input Architecture
 
-All input systems emit normalized attempts into the same command/casting pipeline.
+All input systems emit normalized attempts into the same spell-casting pipeline.
 
 Supported inputs:
 
-- Voice: full basic command words or full prepared spell names.
-- Keyboard: desktop shortcuts for basic commands and optional spell slots.
+- Voice: full prepared spell names.
+- Keyboard: optional spell slot shortcuts.
 - Pointer/touch: Canvas-rendered buttons, spell slots, drawing grid, and targeting gestures.
 
 Input modules may detect raw events, but they must not apply damage, spend energy, start cooldowns, or choose results.
 
-Voice recognition must accept only complete valid command words or prepared spell names. Failed recognition spends no energy and starts the configured voice retry delay.
+Voice recognition must accept only complete valid prepared spell names. Failed recognition spends no energy and starts the configured voice retry delay.
 
 ## Spell Preparation System
 
@@ -188,14 +187,7 @@ Spell data includes:
 
 ## Combat And Casting System
 
-The combat layer owns command validation, energy spending, cooldowns, active durations, effect creation, and failed-action reasons.
-
-A basic command succeeds only when:
-
-- The command is valid.
-- The actor is not defeated.
-- The match is active.
-- The command cooldown is ready.
+The combat layer owns spell validation, energy spending, cooldowns, active durations, effect creation, and failed-cast reasons.
 
 A spell cast succeeds only when:
 
@@ -208,7 +200,6 @@ A spell cast succeeds only when:
 
 Failure reasons must be clear and user-facing:
 
-- Unknown Command.
 - Unknown Spell.
 - Cooldown.
 - Not Enough Energy.
@@ -257,13 +248,9 @@ spellCost = baseCostForWeight + crossedLineCount * crossedLineEnergyPenalty
 
 When damage lands:
 
-1. Block prevents all incoming damage.
-2. Spell shield absorbs damage, minus allowed piercing.
-3. Defence reduces remaining incoming damage.
-4. Remaining damage reduces HP.
-5. HP is clamped at 0.
-
-Block always has priority over spell shields and Defence.
+1. Spell shield absorbs damage, minus allowed piercing.
+2. Remaining damage reduces HP.
+3. HP is clamped at 0.
 
 ### Match Result
 
@@ -276,7 +263,7 @@ Block always has priority over spell shields and Defence.
 
 ## AI Architecture
 
-The AI uses the same commands, spell rules, energy rules, cooldown rules, and damage resolver as the player.
+The AI uses the same spell rules, energy rules, cooldown rules, and damage resolver as the player.
 
 AI may own decision logic, but not separate combat rules.
 
@@ -284,9 +271,9 @@ AI behavior:
 
 - Attempts an action at the configured interval while the match is active.
 - Cannot act while defeated or outside Match state.
-- Chooses only affordable spells and ready commands.
-- Prefers Attack or Attack spells when the opponent is vulnerable.
-- May use Defence, Block, or Defense spells in response to Skill or heavy Attack spells.
+- Chooses only affordable ready spells.
+- Prefers Attack spells when the opponent is vulnerable.
+- May use Defense spells in response to heavy Attack spells.
 - May use Support spells below the configured HP threshold.
 - Uses injected or seeded randomness for testable decisions.
 
@@ -301,7 +288,7 @@ Renderers draw the whole game inside Canvas:
 - Player and AI silhouettes.
 - Dragons and temporary spell effects.
 - HP bars, energy cubes, cooldowns, state labels, latest feedback.
-- Command reference and spell buttons.
+- Prepared spell buttons.
 - Countdown, pause, and result overlays.
 
 Renderers must not contain gameplay logic. They receive state and config, then draw.
@@ -333,7 +320,7 @@ Required log points:
 - Raw voice phrase received.
 - Input normalized or rejected.
 - Cast failed and why.
-- Command or spell executed.
+- Spell executed.
 - Energy spent or regenerated.
 - Cooldown started or completed.
 - Damage, shield, heal, slow, or utility effect applied.
@@ -352,7 +339,7 @@ Add practical comments near important behavior that a designer may tune:
 - Energy regeneration and cooldowns.
 - AI decision weights.
 - Canvas UI layout regions.
-- Voice command mapping.
+- Voice spell-name mapping.
 - Match result rules.
 
 Avoid comments that simply restate obvious code.
@@ -363,7 +350,6 @@ Write automated tests for all logic-based code. Tests must not depend on Canvas 
 
 Required test coverage:
 
-- Basic command mapping and unknown command rejection.
 - Spell name mapping and duplicate or similar-name rejection.
 - Pattern connection counting and weight bands.
 - Energy cost calculation, including crossed-line penalty.
@@ -372,20 +358,18 @@ Required test coverage:
 - Unstable misfire outcome with seeded randomness.
 - Voice retry delay and global voice lockout.
 - Energy spend, shortage, regeneration, and clamping.
-- Cooldown success and failure for commands and spells.
-- Attack, Skill, and Attack spell damage.
+- Cooldown success and failure for spells.
+- Attack spell damage.
 - Defense spell shield absorption.
 - Support spell healing and HP clamp.
 - Control slow duration.
 - Utility energy regeneration buff.
-- Block priority over shield and Defence.
-- Defence reduction after shield resolution.
 - HP clamping at 0.
 - Simultaneous defeat energy tiebreaker and draw.
 - Timer win, timer lose, timer energy tiebreaker, and timer draw.
-- AI cannot use actions or spells on cooldown.
+- AI cannot use spells on cooldown.
 - AI cannot act when defeated or outside Match state.
-- Commands ignored outside active Match state.
+- Spells ignored outside active Match state.
 - Restart resets match state.
 
 Update tests for every new feature or design change. Run tests before reporting completion.
@@ -435,22 +419,6 @@ The centralized config must include at least these sections. Each key must have 
 - `baseEnergyRegenPerSecond`
 - `simultaneousDefeatUsesEnergyTiebreaker`
 - `timerTieUsesEnergyTiebreaker`
-
-### Basic Commands
-
-- `basicCommandWords`
-- `attackDamage`
-- `attackCooldownSeconds`
-- `attackStateDurationSeconds`
-- `defenceDamageMultiplier`
-- `defenceDurationSeconds`
-- `defenceCooldownSeconds`
-- `blockDamageMultiplier`
-- `blockDurationSeconds`
-- `blockCooldownSeconds`
-- `skillDamage`
-- `skillCooldownSeconds`
-- `skillStateDurationSeconds`
 
 ### Spell Loadout
 
@@ -532,11 +500,9 @@ The centralized config must include at least these sections. Each key must have 
 - `aiAttackWeight`
 - `aiAttackSpellWeight`
 - `aiDefenseWeight`
-- `aiBlockWeight`
 - `aiSupportWeight`
 - `aiControlWeight`
 - `aiUtilityWeight`
-- `aiSkillWeight`
 - `aiRandomSeed`
 
 ### Input
@@ -584,9 +550,7 @@ The centralized config must include at least these sections. Each key must have 
 - `timerRect`
 - `playerFeedbackRect`
 - `aiFeedbackRect`
-- `commandReferenceRect`
 - `spellButtonRects`
-- `basicCommandButtonRects`
 - `microphoneButtonRect`
 - `stateLabelOffsetY`
 - `hpBarSize`
@@ -607,8 +571,6 @@ The centralized config must include at least these sections. Each key must have 
 - `colorCooldownActive`
 - `colorAttackEffect`
 - `colorDefenseEffect`
-- `colorBlockEffect`
-- `colorSkillEffect`
 - `colorSupportEffect`
 - `colorControlEffect`
 - `colorUtilityEffect`
@@ -647,8 +609,8 @@ The prototype is technically acceptable when:
 - Config keys are commented for non-coders.
 - Game, spell, AI, input, UI, and render systems are decoupled.
 - The player can create or generate five spells, name them, and enter combat.
-- Voice, keyboard, and Canvas fallback controls feed the same normalized casting path.
-- Commands and spells follow the GDD rules.
+- Voice, keyboard, and Canvas fallback controls feed the same normalized spell-casting path.
+- Prepared spell skills follow the GDD rules.
 - HP, energy, cooldowns, state labels, latest feedback, and result state are visible.
 - The AI can complete a match using the same rules as the player.
 - Automated tests cover all logic-based systems.
