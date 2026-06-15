@@ -3,7 +3,7 @@ import { commandTextForAction, getActionByKey, truncateTranscript } from '../com
 import { attemptCommand } from '../combat/matchRules.js';
 import { resetGameState } from '../core/gameState.js';
 import { showMatchPreview, showPreparation } from '../core/stateMachine.js';
-import { addPatternPoint, clearDraftPattern, confirmLoadout, cycleDraftName, editDraftName, randomizeDraftPattern, saveDraftSpell, selectSpellType } from '../states/preparationState.js';
+import { addPatternPoint, clearDraftPattern, confirmLoadout, cycleDraftName, editDraftName, randomizeDraftPattern, saveDraftSpell, selectSpellType, randomizeSpellType, prepareAllSpells } from '../states/preparationState.js';
 import { getEggGridPoints, getPreparationRects } from '../ui/layout.js';
 
 function mapPointerToCanvas(event, canvas, config) {
@@ -114,6 +114,11 @@ export function createInputController({ canvas, state, logger, random = Math.ran
       return;
     }
 
+    if (button.kind === 'random-spell-type') {
+      randomizeSpellType(state, random, logger, config);
+      return;
+    }
+
     if (button.kind === 'random-pattern') {
       randomizeDraftPattern(state, random, logger, config);
       return;
@@ -131,6 +136,11 @@ export function createInputController({ canvas, state, logger, random = Math.ran
 
     if (button.kind === 'save-spell') {
       saveDraftSpell(state, logger, config);
+      return;
+    }
+
+    if (button.kind === 'prepare-all-spells') {
+      prepareAllSpells(state, logger, config);
       return;
     }
 

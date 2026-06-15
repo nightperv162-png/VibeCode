@@ -470,11 +470,13 @@ function drawPreparationScreen(ctx, state, config) {
   panel(ctx, rects.forgePanel.x, rects.forgePanel.y, rects.forgePanel.width, rects.forgePanel.height, config);
   drawPreparationPanelText(ctx, rects.forgePanel, state, config);
   drawButton(ctx, state, 'random-pattern', 'random-pattern', config.text.randomPatternLabel, rects.randomPatternButton, null, config);
+  drawButton(ctx, state, 'random-spell-type', 'random-spell-type', 'Random Type', rects.randomSpellTypeButton, null, config);
   drawButton(ctx, state, 'clear-pattern', 'clear-pattern', config.text.clearPatternLabel, rects.clearPatternButton, null, config);
 
   panel(ctx, rects.spellSlots.x, rects.spellSlots.y, rects.spellSlots.width, rects.spellSlots.height, config);
   drawSpellSlots(ctx, rects.spellSlots, state, config);
   drawButton(ctx, state, 'save-spell', 'save-spell', config.text.saveSpellLabel, rects.saveSpellButton, null, config);
+  drawButton(ctx, state, 'prepare-all-spells', 'prepare-all-spells', 'Prepare All 5', rects.prepareAllSpellsButton, null, config);
   drawButton(ctx, state, 'preview-match', 'preview-match', config.text.confirmLoadoutLabel, rects.confirmLoadoutButton, null, config);
 
   ctx.font = font(config.fonts.smallSize, config.fonts.boldWeight, config);

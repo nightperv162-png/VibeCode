@@ -59,6 +59,18 @@ export function getPreparationRects(config = CONFIG) {
       y: config.layout.forgePanelY + config.layout.forgePanelHeight - config.layout.prepButtonHeight - config.layout.outerPadding,
       width: config.layout.saveSpellButtonWidth,
       height: config.layout.prepButtonHeight
+    },
+    randomSpellTypeButton: {
+      x: config.layout.forgePanelX + config.layout.outerPadding,
+      y: config.layout.forgePanelY + config.layout.forgePanelHeight - config.layout.prepButtonHeight * config.match.sideCount - config.layout.outerPadding - config.layout.spellSlotGap,
+      width: config.layout.saveSpellButtonWidth,
+      height: config.layout.prepButtonHeight
+    },
+    prepareAllSpellsButton: {
+      x: config.layout.spellSlotsX + config.layout.outerPadding,
+      y: config.layout.spellSlotsY + config.layout.spellSlotsHeight - config.layout.prepButtonHeight * config.match.sideCount - config.layout.outerPadding - config.layout.spellSlotGap * config.match.sideCount - config.layout.prepButtonHeight - config.layout.spellSlotGap,
+      width: config.layout.prepButtonWidth,
+      height: config.layout.prepButtonHeight
     }
   };
 }

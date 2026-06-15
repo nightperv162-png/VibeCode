@@ -4,6 +4,7 @@ import { addPointToPattern, analyzePattern, generateRandomPattern } from '../spe
 import { createSpell, normalizeSpellName } from '../spells/spellFactory.js';
 import { nextOpenSlotIndex, validateLoadout, validateSpellName } from '../spells/spellLoadout.js';
 import { formatPatternSummary, getSpellEffectPreview } from '../spells/spellRules.js';
+import { createSeededRandom } from '../core/random.js';
 
 export function refreshPreparationPreview(state, logger, config = CONFIG) {
   const analysis = analyzePattern(state.preparation.draftPatternPoints, config);
@@ -120,4 +121,61 @@ export function confirmLoadout(state, logger, config = CONFIG) {
   logger?.info('Loadout confirmed');
   showMatchPreview(state, logger, config);
   return validation;
+}
+
+/**
+ * Selects a random spell type from the available types.
+ * @param {Object} state - Game state
+ * @param {Function} random - Random number generator (0 to 1)
+ * @param {Function} logger - Logger instance
+ * @param {Object} config - Configuration
+ * @returns {string} The selected spell type
+ */
+export function randomizeSpellType(state, random, logger, config = CONFIG) {
+  const randomIndex = Math.floor(random() * config.spells.types.length);
+  const spellType = config.spells.types[randomIndex];
+  selectSpellType(state, spellType, logger, config);
+  logger?.info('Random spell type selected', { spellType, index: randomIndex });
+  return spellType;
+}
+
+/**
+ * Auto-generates and saves all 5 spells with random patterns, types, and names.
+ * Used for rapid testing—equivalent to 5x (randomize pattern + random type + cycle name + save).
+ * @param {Object} state - Game state
+ * @param {Function} logger - Logger instance
+ * @param {Object} config - Configuration
+ * @returns {Object} { ok: boolean, count: number }
+ */
+export function prepareAllSpells(state, logger, config = CONFIG) {
+  const random = createSeededRandom(config.ai.defaultSeed);
+  const loadout = state.sides[config.match.playerId].spellLoadout;
+  let savedCount = 0;
+
+  for (let i = 0; i < config.spells.perLoadout; i++) {
+    // Reset draft for each spell
+    state.preparation.draftPatternPoints = [];
+
+    // Randomize pattern
+    randomizeDraftPattern(state, random, logger, config);
+
+    // Pick random spell type
+    randomizeSpellType(state, random, logger, config);
+
+    // Cycle name to next one
+    cycleDraftName(state, logger, config);
+
+    // Save the spell
+    const result = saveDraftSpell(state, logger, config);
+    if (result.ok) {
+      savedCount++;
+      logger?.info(`Auto-spell ${i + 1}/${config.spells.perLoadout} saved`, result.spell);
+    } else {
+      logger?.warn(`Auto-spell ${i + 1} failed`, { reason: result.reason });
+    }
+  }
+
+  state.preparation.feedback = `All 5 spells prepared and ready!`;
+  logger?.info('Prepare all spells complete', { savedCount });
+  return { ok: savedCount === config.spells.perLoadout, count: savedCount };
 }
