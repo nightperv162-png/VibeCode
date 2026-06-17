@@ -3,7 +3,6 @@ import { CONFIG } from '../config.js';
 export function getOrderedScreens(config = CONFIG) {
   return [
     config.states.contractCreation,
-    config.states.contractAnalysis,
     config.states.loadout,
     config.states.combat,
     config.states.pause,
@@ -23,6 +22,7 @@ export function transitionTo(state, screen, config = CONFIG, logger) {
     activeScreen: screen,
     isGuideOpen: false,
     isPaused: screen === config.states.pause,
+    loadoutDetailsOverlay: null,
     guide: { screen }
   };
 }

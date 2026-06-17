@@ -15,6 +15,9 @@ export function createLogger(config = CONFIG) {
     input(message, details) {
       if (canLog('logInputEvents')) console.log(config.logging.prefix, message, details || '');
     },
+    loadout(message, details) {
+      if (canLog('logInputEvents')) console.log(config.logging.prefix, message, details || '');
+    },
     renderer(message, details) {
       if (canLog('logRendererWarnings')) console.warn(config.logging.prefix, message, details || '');
     }

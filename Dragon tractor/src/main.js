@@ -3,7 +3,7 @@ import { createGameLoop } from './core/gameLoop.js';
 import { createInitialGameState } from './core/gameState.js';
 import { createLogger } from './core/logger.js';
 import { createDiagnostics } from './core/diagnostics.js';
-import { handleCanvasPointer } from './ui/canvasButtonSystem.js';
+import { handleCanvasHover, handleCanvasPointer } from './ui/canvasButtonSystem.js';
 import { renderGame } from './render/canvasRenderer.js';
 
 const logger = createLogger(CONFIG);
@@ -34,6 +34,14 @@ function pointerToCanvas(event) {
 
 canvas.addEventListener('pointerdown', (event) => {
   state = handleCanvasPointer(state, pointerToCanvas(event), CONFIG, logger);
+});
+
+canvas.addEventListener('pointermove', (event) => {
+  state = handleCanvasHover(state, pointerToCanvas(event), CONFIG, logger);
+});
+
+canvas.addEventListener('pointerleave', () => {
+  state = { ...state, loadoutDetailsOverlay: null };
 });
 
 window.addEventListener('resize', fitCanvasToWindow);

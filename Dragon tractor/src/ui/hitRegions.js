@@ -29,6 +29,34 @@ export function createHitRegions(state, config = CONFIG) {
 
   if (state.activeScreen === config.states.contractCreation) {
     regions.push({ id: 'drawingArea', action: 'drawingPlaceholder', rect: config.layout.drawingAreaRect, label: config.labels.drawSigil });
+    if (state.contractCreation.hasDrawing) {
+      regions.push({ id: 'saveContract', action: 'saveContract', rect: config.layout.saveContractButtonRect, label: config.labels.saveContract });
+      regions.push({ id: 'redrawContract', action: 'redrawContract', rect: config.layout.redrawButtonRect, label: config.labels.redraw });
+      regions.push({ id: 'rerollCallName', action: 'rerollPlaceholder', rect: config.layout.rerollButtonRect, label: config.labels.reroll });
+    }
+  }
+
+  if (state.activeScreen === config.states.loadout) {
+    config.layout.libraryItemRects.forEach((rect, index) => {
+      regions.push({
+        id: `libraryItem-${index}`,
+        action: 'showLoadoutDetails',
+        rect,
+        source: 'library',
+        itemIndex: index,
+        label: config.labels.contractDetails
+      });
+    });
+    config.layout.loadoutSlotRects.forEach((rect, index) => {
+      regions.push({
+        id: `loadoutSlot-${index}`,
+        action: 'showLoadoutDetails',
+        rect,
+        source: 'slot',
+        slotIndex: index,
+        label: config.labels.contractDetails
+      });
+    });
   }
 
   if (state.isGuideOpen) {

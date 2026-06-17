@@ -24,8 +24,6 @@ export const CONFIG = {
     initialScreen: 'ContractCreation',
     // Screen shown for the forging and drawing shell. Rename only with matching state-machine changes. Recommended: ContractCreation.
     contractCreation: 'ContractCreation',
-    // Screen shown for the analysis receipt placeholder. Rename only with matching navigation changes. Recommended: ContractAnalysis.
-    contractAnalysis: 'ContractAnalysis',
     // Screen shown for battle-slot preparation. Rename only with matching navigation changes. Recommended: Loadout.
     loadout: 'Loadout',
     // Screen shown for static battle layout preview. Rename only with matching navigation changes. Recommended: Combat.
@@ -65,6 +63,12 @@ export const CONFIG = {
     // Exit status used when build scripts fail. Change only for platform integration. Recommended value: 1.
     failureStatus: 1
   },
+  numbers: {
+    // Decimal radix used when parsing display costs into numeric placeholder costs. Change only for unusual number formats. Recommended value: 10.
+    decimalRadix: 10,
+    // First loadout slot index used when a placeholder saved contract is equipped. Keep zero for array-first slot. Recommended value: 0.
+    firstSlotIndex: 0
+  },
   timing: {
     // Milliseconds in one second for frame delta conversion. Change only for unusual runtime timing. Recommended value: 1000.
     millisecondsPerSecond: 1000
@@ -89,7 +93,13 @@ export const CONFIG = {
     // Save contract placeholder label. Later milestones wire this to library saving. Recommended length: 8-24 characters.
     saveContract: 'Save Contract',
     // Redraw placeholder label. Later milestones wire this to drawing reset. Recommended length: 5-16 characters.
-    redraw: 'Redraw'
+    redraw: 'Redraw',
+    // Reroll placeholder label for the Contract Call row. Recommended length: 5-16 characters.
+    reroll: 'Reroll',
+    // Contract details overlay title in Loadout. Recommended length: 12-28 characters.
+    contractDetails: 'Contract Details',
+    // Empty analysis panel label before drawing. Recommended length: 16-48 characters.
+    drawFirst: 'Draw a sigil to reveal Contract Analysis.'
   },
   match: {
     // Planned match length in seconds. Higher values make rounds longer. Recommended range: 45-90.
@@ -126,8 +136,42 @@ export const CONFIG = {
     placeholderCallNames: ['Ignivar', 'Voltaris', 'Mirava', 'Vorn'],
     // Placeholder Energy costs shown in compact HUD. Keep close to starter balance. Recommended range: 0-30.
     placeholderEnergyCosts: [10, 30, 25, 25],
+    // Minimum text width for compact Call Names before cost. Higher values increase spacing. Recommended range: 8-14.
+    compactCallNamePadLength: 10,
     // Resonance labels shown in duplicate-slot areas. Keep one word for compact UI. Recommended count: 4.
-    resonanceLabels: ['Normal', 'Echo', 'Surge', 'Overload']
+    resonanceLabels: ['Normal', 'Echo', 'Surge', 'Overload'],
+    // Placeholder contract used before real forging exists. Keep values close to GDD examples. Recommended: one Damage contract.
+    sampleAnalysisContract: {
+      id: 'sample-ignivar-flame-bite',
+      fullContractName: "Ignivar's Flame Bite",
+      dragonTraitPower: 'Ignivar - Fierce - Flame Bite',
+      contractType: 'Damage',
+      callName: 'Ignivar',
+      effect: '12 Damage',
+      cost: '10 Energy',
+      cooldown: '1.5s',
+      why: 'Sharp + energetic drawing improved damage.',
+      duration: '',
+      grade: 'Strong',
+      trait: 'Fierce',
+      resonance: 'Normal'
+    },
+    // Placeholder Vitality contract for detail-overlay display checks. Player-facing effect must stay as Max HP only. Recommended effect format: +X Max HP.
+    sampleVitalityContract: {
+      id: 'sample-vorn-blood-crown',
+      fullContractName: "Vorn's Blood Crown",
+      dragonTraitPower: 'Vorn - Ancient - Blood Crown',
+      contractType: 'Vitality',
+      callName: 'Vorn',
+      effect: '+50 Max HP',
+      cost: '25 Energy',
+      cooldown: '1.5s',
+      why: 'Stable sealed drawing reinforced vitality.',
+      duration: '7s',
+      grade: 'Strong',
+      trait: 'Ancient',
+      resonance: 'Normal'
+    }
   },
   layout: {
     // Top navigation band rectangle. Adjust height if title or buttons feel cramped. Recommended height: 56-88.
@@ -146,6 +190,19 @@ export const CONFIG = {
     analysisPanelRect: { x: 832, y: 128, width: 368, height: 488 },
     // Contract library placeholder rectangle. Recommended width: 340-460.
     libraryRect: { x: 64, y: 152, width: 392, height: 420 },
+    // Library item rectangles for selecting or hovering saved contracts. Keep within libraryRect. Recommended count: 2-6.
+    libraryItemRects: [
+      { x: 88, y: 232, width: 344, height: 72 },
+      { x: 88, y: 320, width: 344, height: 72 }
+    ],
+    // Save Contract button inside the Contract Analysis receipt. Keep inside analysisPanelRect. Recommended width: 140-180.
+    saveContractButtonRect: { x: 856, y: 548, width: 156, height: 44 },
+    // Redraw button inside the Contract Analysis receipt. Keep inside analysisPanelRect. Recommended width: 100-140.
+    redrawButtonRect: { x: 1040, y: 548, width: 124, height: 44 },
+    // Reroll button beside the Contract Call. Keep small and near call name. Recommended width: 72-110.
+    rerollButtonRect: { x: 1016, y: 280, width: 96, height: 36 },
+    // Loadout detail overlay rectangle. Large enough for receipt fields without becoming permanent layout. Recommended width: 420-560.
+    detailsOverlayRect: { x: 768, y: 126, width: 432, height: 468 },
     // Loadout slot rectangles. Keep count aligned to maxEquippedSlots. Recommended slot height: 76-100.
     loadoutSlotRects: [
       { x: 520, y: 152, width: 304, height: 84 },
@@ -273,11 +330,9 @@ export const CONFIG = {
   },
   guides: {
     // Contract Creation guide text. Keep readable in under ten seconds. Recommended: 3-5 short lines.
-    ContractCreation: ['Choose a Contract Type.', 'Draw a sigil in the canvas area.', 'Milestone 1 shows the shell; forging arrives next.'],
-    // Contract Analysis guide text. Keep focused on the receipt. Recommended: 3-5 short lines.
-    ContractAnalysis: ['Review Dragon, Trait, and Power.', 'Check Call Name, effect, cost, cooldown, and Why.', 'Save and redraw are placeholders in this milestone.'],
+    ContractCreation: ['Choose a Contract Type.', 'Draw a sigil to reveal Contract Analysis.', 'Save moves the placeholder contract to Loadout.'],
     // Loadout guide text. Keep focused on slots and Call Names. Recommended: 3-5 short lines.
-    Loadout: ['Equip saved contracts into four battle slots.', 'Duplicate contracts will show Resonance.', 'Different contracts need unique Call Names.'],
+    Loadout: ['Select or hover a contract or slot for details.', 'Details are a temporary overlay, not a permanent analysis screen.', 'Different contracts need unique Call Names.'],
     // Combat guide text. Keep focused on visible shell controls. Recommended: 3-5 short lines.
     Combat: ['Use short Call Names or slot keys.', 'Watch HP, Energy, cooldown state, and latest calls.', 'Guide pauses combat in later milestones.'],
     // Pause guide text. Keep focused on pause behavior. Recommended: 2-4 short lines.

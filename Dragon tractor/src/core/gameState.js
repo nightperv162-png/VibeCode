@@ -9,6 +9,11 @@ export function createInitialGameState(config = CONFIG) {
     selectedContractType: config.contracts.enabledContractTypes[0],
     latestInput: null,
     latestFailureReason: null,
+    contractCreation: {
+      hasDrawing: false,
+      analysisContract: config.contracts.sampleAnalysisContract
+    },
+    loadoutDetailsOverlay: null,
     match: {
       timerSeconds: config.match.matchDurationSeconds,
       countdownSeconds: config.match.countdownSeconds,
@@ -24,15 +29,16 @@ export function createInitialGameState(config = CONFIG) {
       maxHp: config.match.baseMaxHp,
       energy: config.match.startingEnergy
     },
-    contractLibrary: [],
+    contractLibrary: [config.contracts.sampleVitalityContract],
     equippedSlots: config.contracts.slotMarkerLabels.map((markerLabel, index) => ({
       slotId: markerLabel,
       markerLabel,
-      contractId: null,
+      contractId: index === config.contracts.maxEquippedSlots - config.process.failureStatus ? config.contracts.sampleVitalityContract.id : null,
       resolvedCallName: config.contracts.placeholderCallNames[index],
       energyCost: config.contracts.placeholderEnergyCosts[index],
       resonanceLabel: config.contracts.resonanceLabels[0],
-      stateLabel: config.labels.readyState
+      stateLabel: config.labels.readyState,
+      detailsContract: index === config.contracts.maxEquippedSlots - config.process.failureStatus ? config.contracts.sampleVitalityContract : null
     })),
     guide: {
       screen: config.states.initialScreen
