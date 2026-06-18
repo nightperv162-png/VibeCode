@@ -3,26 +3,662 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Dragon Fighter</title>
+    <title>Voice Command Battle</title>
     <style>
       html,
       body {
         margin: 0;
-        width: 100%;
         height: 100%;
+        background: #0b1020;
+        color: #fff4d6;
+        font-family: system-ui, "Segoe UI", sans-serif;
         overflow: hidden;
-        background: #06101d;
+      }
+
+      .wrap {
+        box-sizing: border-box;
+        display: grid;
+        height: 100%;
+        padding: 12px;
+        place-items: center;
+      }
+
+      .box {
+        width: min(1100px, 98vw);
       }
 
       canvas {
+        aspect-ratio: 16 / 9;
+        background: #17223a;
+        border: 3px solid #f6c453;
+        border-radius: 20px;
+        box-shadow: 0 20px 70px #0009;
         display: block;
-        width: 100vw;
-        height: 100vh;
+        touch-action: none;
+        width: 100%;
+      }
+
+      .bar {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+        margin-top: 10px;
+      }
+
+      button {
+        background: #101827;
+        border: 1px solid #f6c453;
+        border-radius: 999px;
+        color: #fff4d6;
+        cursor: pointer;
+        font-weight: 800;
+        padding: 10px 14px;
+      }
+
+      button:hover {
+        background: #2b3650;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      #mic {
+        background: #f6c453;
+        color: #18120a;
+      }
+
+      .note {
+        color: #cbd5e1;
+        font-size: 14px;
+        margin-top: 8px;
+        text-align: center;
       }
     </style>
   </head>
   <body>
-    <canvas id="game"></canvas>
-    <script type="module" src="./src/main.js"></script>
+    <div class="wrap">
+      <div class="box">
+        <canvas id="game" width="1100" height="620"></canvas>
+        <div class="bar">
+          <button id="mic">Start microphone</button>
+          <button id="attack">Attack</button>
+          <button id="defence">Defence</button>
+          <button id="ultimate">Ultimate</button>
+          <button id="restart">Restart</button>
+        </div>
+        <div class="note" id="note">Say: Attack, Defence, Ultimate. Fallback keys: A / D / U / R.</div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const canvas = document.getElementById("game");
+        const ctx = canvas.getContext("2d");
+        const note = document.getElementById("note");
+        const micButton = document.getElementById("mic");
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        const cfg = {
+          matchTime: 60,
+          maxHp: 100,
+          attackDamage: 12,
+          ultimateDamage: 35,
+          enemyDamage: 10,
+          attackCd: 1.0,
+          defenceCd: 5.0,
+          ultimateCd: 9.0,
+          defenceTime: 3.0,
+          defenceReduce: 0.35,
+          enemyMinWait: 1.3,
+          enemyMaxWait: 2.4,
+          assets: {
+            background: "public/assets/backgrounds/arena.png",
+            player: "public/assets/dragons/fire-dragon-adult.png",
+            enemy: "public/assets/dragons/moss-boss-dragon-enemy.png"
+          }
+        };
+
+        const state = {
+          phase: "ready",
+          time: cfg.matchTime,
+          playerHp: cfg.maxHp,
+          enemyHp: cfg.maxHp,
+          lastHeard: "-",
+          accepted: "-",
+          playerState: "Ready",
+          enemyState: "Ready",
+          message: "Press microphone and say Attack, Defence, or Ultimate.",
+          result: "",
+          cd: { attack: 0, defence: 0, ultimate: 0 },
+          defenceTimer: 0,
+          enemyTimer: 1.6,
+          shake: 0,
+          particles: []
+        };
+
+        const images = {};
+        let recognition = null;
+        let listening = false;
+        let last = performance.now();
+
+        const rand = (a, b) => a + Math.random() * (b - a);
+        const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+        const log = (name, data = {}) => console.log("[VoiceBattle]", name, data);
+
+        function loadImage(key, src) {
+          const image = new Image();
+          image.onload = () => log("asset_loaded", { key, src });
+          image.onerror = () => log("asset_failed", { key, src });
+          image.src = src;
+          images[key] = image;
+        }
+
+        Object.entries(cfg.assets).forEach(([key, src]) => loadImage(key, src));
+
+        function reset() {
+          state.phase = "playing";
+          state.time = cfg.matchTime;
+          state.playerHp = cfg.maxHp;
+          state.enemyHp = cfg.maxHp;
+          state.lastHeard = "-";
+          state.accepted = "-";
+          state.playerState = "Ready";
+          state.enemyState = "Ready";
+          state.message = "Battle started. Say Attack, Defence, or Ultimate.";
+          state.result = "";
+          state.cd.attack = 0;
+          state.cd.defence = 0;
+          state.cd.ultimate = 0;
+          state.defenceTimer = 0;
+          state.enemyTimer = rand(cfg.enemyMinWait, cfg.enemyMaxWait);
+          state.shake = 0;
+          state.particles = [];
+          log("reset");
+        }
+
+        function normalize(text) {
+          return String(text || "")
+            .toLowerCase()
+            .replace(/[.,!?;:]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        }
+
+        function commandFromSpeech(text) {
+          const words = normalize(text).split(" ").filter(Boolean);
+          state.lastHeard = words.join(" ") || "-";
+
+          if (words.includes("attack")) return "attack";
+          if (words.includes("defence") || words.includes("defense")) return "defence";
+          if (words.includes("ultimate")) return "ultimate";
+          return null;
+        }
+
+        function useCommand(cmd, source = "button") {
+          if (state.phase !== "playing") reset();
+
+          state.accepted = cmd.toUpperCase();
+          log("command", { cmd, source });
+
+          if (state.cd[cmd] > 0) {
+            state.message = `${cmd.toUpperCase()} cooldown: ${state.cd[cmd].toFixed(1)}s`;
+            state.playerState = "Cooldown";
+            return;
+          }
+
+          if (cmd === "attack") {
+            state.cd.attack = cfg.attackCd;
+            state.enemyHp = clamp(state.enemyHp - cfg.attackDamage, 0, cfg.maxHp);
+            state.playerState = "Attack";
+            state.enemyState = "Hit";
+            state.message = `Attack hit. Enemy -${cfg.attackDamage} HP`;
+            hit(780, 315, "#fb923c", 18);
+            state.shake = 0.15;
+          }
+
+          if (cmd === "defence") {
+            state.cd.defence = cfg.defenceCd;
+            state.defenceTimer = cfg.defenceTime;
+            state.playerState = "Defence";
+            state.message = `Defence shield active for ${cfg.defenceTime} seconds`;
+            shield(320, 315);
+          }
+
+          if (cmd === "ultimate") {
+            state.cd.ultimate = cfg.ultimateCd;
+            state.enemyHp = clamp(state.enemyHp - cfg.ultimateDamage, 0, cfg.maxHp);
+            state.playerState = "Ultimate";
+            state.enemyState = "Crushed";
+            state.message = `Ultimate hit. Enemy -${cfg.ultimateDamage} HP`;
+            hit(780, 315, "#a78bfa", 40);
+            state.shake = 0.3;
+          }
+
+          checkEnd();
+        }
+
+        function enemyAttack() {
+          if (state.phase !== "playing") return;
+
+          const defended = state.defenceTimer > 0;
+          const dmg = Math.round(cfg.enemyDamage * (defended ? cfg.defenceReduce : 1));
+
+          state.playerHp = clamp(state.playerHp - dmg, 0, cfg.maxHp);
+          state.enemyState = "Attack";
+          state.playerState = defended ? "Blocked" : "Hit";
+          state.message = defended ? `Defence reduced damage. You -${dmg} HP` : `Enemy hit. You -${dmg} HP`;
+          hit(320, 315, defended ? "#60a5fa" : "#ef4444", defended ? 10 : 18);
+          state.shake = 0.16;
+          state.enemyTimer = rand(cfg.enemyMinWait, cfg.enemyMaxWait);
+          log("enemy_attack", { dmg, defended });
+          checkEnd();
+        }
+
+        function checkEnd() {
+          if (state.playerHp <= 0 && state.enemyHp <= 0) finish("DRAW");
+          else if (state.enemyHp <= 0) finish("YOU WIN");
+          else if (state.playerHp <= 0) finish("YOU LOSE");
+          else if (state.time <= 0) {
+            if (state.playerHp > state.enemyHp) finish("YOU WIN BY HP");
+            else if (state.enemyHp > state.playerHp) finish("YOU LOSE BY HP");
+            else finish("DRAW");
+          }
+        }
+
+        function finish(result) {
+          state.phase = "ended";
+          state.result = result;
+          state.message = "Press R or Restart to play again.";
+          log("finish", { result, playerHp: state.playerHp, enemyHp: state.enemyHp });
+        }
+
+        function hit(x, y, color, count) {
+          for (let i = 0; i < count; i += 1) {
+            state.particles.push({
+              x,
+              y,
+              vx: rand(-180, 180),
+              vy: rand(-150, 150),
+              life: rand(0.35, 0.8),
+              max: 0.8,
+              size: rand(4, 10),
+              color
+            });
+          }
+        }
+
+        function shield(x, y) {
+          for (let i = 0; i < 28; i += 1) {
+            const a = Math.PI * 2 * i / 28;
+            state.particles.push({
+              x: x + Math.cos(a) * 58,
+              y: y + Math.sin(a) * 58,
+              vx: Math.cos(a) * 44,
+              vy: Math.sin(a) * 44,
+              life: 0.75,
+              max: 0.75,
+              size: 5,
+              color: "#60a5fa"
+            });
+          }
+        }
+
+        function update(dt) {
+          if (state.shake > 0) state.shake -= dt;
+          ["attack", "defence", "ultimate"].forEach((k) => {
+            state.cd[k] = Math.max(0, state.cd[k] - dt);
+          });
+
+          if (state.defenceTimer > 0) state.defenceTimer = Math.max(0, state.defenceTimer - dt);
+
+          state.particles.forEach((p) => {
+            p.life -= dt;
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx *= 0.98;
+            p.vy *= 0.98;
+          });
+          state.particles = state.particles.filter((p) => p.life > 0);
+
+          if (state.phase !== "playing") return;
+
+          state.time = Math.max(0, state.time - dt);
+          state.enemyTimer -= dt;
+
+          if (state.enemyTimer <= 0) enemyAttack();
+          if (state.time <= 0) checkEnd();
+        }
+
+        function rr(x, y, w, h, r, fill, stroke) {
+          ctx.beginPath();
+          ctx.roundRect(x, y, w, h, r);
+          if (fill) {
+            ctx.fillStyle = fill;
+            ctx.fill();
+          }
+          if (stroke) {
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+        }
+
+        function hpBar(x, y, w, h, value, color, label) {
+          rr(x, y, w, h, 10, "#0008", "#ffffff33");
+          rr(x + 3, y + 3, (w - 6) * clamp(value / cfg.maxHp, 0, 1), h - 6, 8, color, null);
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 16px system-ui";
+          ctx.fillText(`${label}: ${Math.ceil(value)}/${cfg.maxHp}`, x + w / 2, y + h - 8);
+          ctx.textAlign = "left";
+        }
+
+        function cdBox(x, y, label, key, color) {
+          const max = key === "attack" ? cfg.attackCd : key === "defence" ? cfg.defenceCd : cfg.ultimateCd;
+          const ready = state.cd[key] <= 0;
+
+          rr(x, y, 118, 50, 14, ready ? "#123326dd" : "#3b2230dd", color);
+          ctx.textAlign = "center";
+          ctx.fillStyle = ready ? "#bbf7d0" : "#fecaca";
+          ctx.font = "bold 14px system-ui";
+          ctx.fillText(label, x + 59, y + 21);
+          ctx.font = "12px system-ui";
+          ctx.fillText(ready ? "READY" : `${state.cd[key].toFixed(1)}s`, x + 59, y + 39);
+          if (!ready) {
+            ctx.fillStyle = "#0005";
+            ctx.fillRect(x + 5, y + 5, 108 * (state.cd[key] / max), 40);
+          }
+          ctx.textAlign = "left";
+        }
+
+        function fallbackDragon(x, y, flip, body, wing, horn) {
+          ctx.save();
+          ctx.translate(x, y);
+          if (flip) ctx.scale(-1, 1);
+          ctx.fillStyle = "#0005";
+          ctx.beginPath();
+          ctx.ellipse(0, 72, 92, 23, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = wing;
+          ctx.strokeStyle = "#0008";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(-25, 5);
+          ctx.lineTo(-115, -70);
+          ctx.lineTo(-85, 35);
+          ctx.closePath();
+          ctx.moveTo(28, 5);
+          ctx.lineTo(100, -55);
+          ctx.lineTo(80, 35);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = body;
+          ctx.beginPath();
+          ctx.ellipse(0, 18, 55, 72, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.ellipse(50, -40, 48, 37, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = horn;
+          ctx.beginPath();
+          ctx.moveTo(34, -72);
+          ctx.lineTo(14, -112);
+          ctx.lineTo(55, -80);
+          ctx.closePath();
+          ctx.moveTo(68, -70);
+          ctx.lineTo(98, -100);
+          ctx.lineTo(82, -56);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#111827";
+          ctx.beginPath();
+          ctx.arc(66, -48, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        function drawDragonImage(key, x, y, w, h, flip) {
+          const image = images[key];
+
+          if (!image || !image.complete || image.naturalWidth === 0) {
+            fallbackDragon(x, y, flip, key === "player" ? "#d6a44c" : "#a855f7", key === "player" ? "#8b5a2b" : "#6d28d9", key === "player" ? "#f3d179" : "#fca5a5");
+            return;
+          }
+
+          ctx.save();
+          ctx.translate(x, y);
+          if (flip) ctx.scale(-1, 1);
+          ctx.fillStyle = "#0005";
+          ctx.beginPath();
+          ctx.ellipse(0, h * 0.42, w * 0.42, 23, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.drawImage(image, -w / 2, -h / 2, w, h);
+          if (!flip && state.defenceTimer > 0) {
+            ctx.strokeStyle = "#60a5facc";
+            ctx.lineWidth = 7;
+            ctx.beginPath();
+            ctx.arc(0, 0, Math.max(w, h) * 0.55, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        function drawArena() {
+          const bg = images.background;
+
+          if (bg && bg.complete && bg.naturalWidth > 0) {
+            ctx.drawImage(bg, 0, 0, 1100, 620);
+            ctx.fillStyle = "#02061755";
+            ctx.fillRect(0, 0, 1100, 620);
+            return;
+          }
+
+          const g = ctx.createLinearGradient(0, 0, 0, 620);
+          g.addColorStop(0, "#263a5b");
+          g.addColorStop(0.6, "#17233a");
+          g.addColorStop(1, "#0b1020");
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, 1100, 620);
+          ctx.fillStyle = "#f6c45318";
+          ctx.beginPath();
+          ctx.ellipse(550, 350, 445, 115, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#f6c45355";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.ellipse(550, 350, 455, 122, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        function draw() {
+          ctx.save();
+          if (state.shake > 0) ctx.translate(rand(-6, 6), rand(-5, 5));
+
+          drawArena();
+          drawDragonImage("player", 320, 330, 255, 185, false);
+          drawDragonImage("enemy", 780, 330, 255, 185, true);
+
+          state.particles.forEach((p) => {
+            ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+          });
+
+          rr(22, 20, 390, 105, 18, "#07101dcc", "#ffffff22");
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 24px system-ui";
+          ctx.fillText("Player Dragon", 45, 54);
+          hpBar(45, 70, 330, 32, state.playerHp, "#34d399", "HP");
+
+          rr(688, 20, 390, 105, 18, "#07101dcc", "#ffffff22");
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 24px system-ui";
+          ctx.fillText("Enemy Dragon", 710, 54);
+          hpBar(710, 70, 330, 32, state.enemyHp, "#ef4444", "HP");
+
+          rr(465, 18, 170, 78, 18, "#07101de0", "#f6c45388");
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#f6c453";
+          ctx.font = "bold 17px system-ui";
+          ctx.fillText("TIME", 550, 45);
+          ctx.font = "bold 32px system-ui";
+          ctx.fillText(String(Math.ceil(state.time)), 550, 80);
+          ctx.textAlign = "left";
+
+          cdBox(45, 145, "Attack", "attack", "#fb923c");
+          cdBox(172, 145, "Defence", "defence", "#60a5fa");
+          cdBox(299, 145, "Ultimate", "ultimate", "#a78bfa");
+
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 19px system-ui";
+          ctx.fillText(state.playerState, 320, 215);
+          ctx.fillText(state.enemyState, 780, 215);
+          ctx.textAlign = "left";
+
+          ctx.fillStyle = listening ? "#34d399" : "#fca5a5";
+          ctx.font = "bold 16px system-ui";
+          ctx.fillText(listening ? "Mic listening" : "Mic off", 45, 220);
+
+          rr(245, 132, 610, 58, 18, "#07101dd9", "#f6c45366");
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 21px system-ui";
+          ctx.fillText(state.message, 550, 168);
+          ctx.textAlign = "left";
+
+          rr(310, 500, 480, 95, 20, "#07101dcc", "#f6c45388");
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 20px system-ui";
+          ctx.fillText("VOICE COMMANDS", 550, 528);
+          ctx.font = "bold 18px system-ui";
+          ctx.fillStyle = "#fb923c";
+          ctx.fillText("Attack", 425, 562);
+          ctx.fillStyle = "#60a5fa";
+          ctx.fillText("Defence", 550, 562);
+          ctx.fillStyle = "#a78bfa";
+          ctx.fillText("Ultimate", 680, 562);
+          ctx.fillStyle = "#cbd5e1";
+          ctx.font = "14px system-ui";
+          ctx.fillText(`Latest heard: ${state.lastHeard}   |   Accepted: ${state.accepted}`, 550, 586);
+          ctx.textAlign = "left";
+
+          if (state.phase === "ready" || state.phase === "ended") {
+            ctx.fillStyle = "#020617b8";
+            ctx.fillRect(0, 0, 1100, 620);
+            rr(275, 175, 550, 250, 26, "#0f172af2", "#f6c453dd");
+            ctx.textAlign = "center";
+            ctx.font = "bold 44px system-ui";
+            ctx.fillStyle = state.phase === "ended" ? state.result.includes("WIN") ? "#34d399" : state.result.includes("LOSE") ? "#ef4444" : "#f6c453" : "#fff4d6";
+            ctx.fillText(state.phase === "ended" ? state.result : "Voice Dragon Battle", 550, 250);
+            ctx.fillStyle = "#cbd5e1";
+            ctx.font = "20px system-ui";
+            ctx.fillText("Say: Attack, Defence, Ultimate", 550, 305);
+            ctx.fillText("Or use buttons / keys A, D, U", 550, 340);
+            ctx.fillStyle = "#f6c453";
+            ctx.font = "bold 21px system-ui";
+            ctx.fillText(state.phase === "ended" ? "Press R to play again" : "Use any command to start", 550, 385);
+            ctx.textAlign = "left";
+          }
+
+          ctx.restore();
+        }
+
+        function loop(now) {
+          const dt = Math.min(0.033, (now - last) / 1000);
+          last = now;
+          update(dt);
+          draw();
+          requestAnimationFrame(loop);
+        }
+
+        function setupSpeech() {
+          if (!SpeechRecognition) {
+            note.textContent = "This browser does not support Web Speech API. Use buttons or A/D/U/R.";
+            micButton.disabled = true;
+            return;
+          }
+
+          recognition = new SpeechRecognition();
+          recognition.lang = "en-US";
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.maxAlternatives = 1;
+
+          recognition.onstart = () => {
+            listening = true;
+            micButton.textContent = "Stop microphone";
+            note.textContent = "Listening. Say Attack / Defence / Ultimate.";
+            log("mic_start");
+          };
+
+          recognition.onend = () => {
+            listening = false;
+            micButton.textContent = "Start microphone";
+            note.textContent = "Mic is off. Press to start listening again.";
+            log("mic_end");
+          };
+
+          recognition.onerror = (e) => {
+            note.textContent = `Mic error: ${e.error}. Use buttons or A/D/U.`;
+            log("mic_error", { error: e.error });
+          };
+
+          recognition.onresult = (e) => {
+            for (let i = e.resultIndex; i < e.results.length; i += 1) {
+              const text = e.results[i][0].transcript;
+              state.lastHeard = normalize(text) || "-";
+
+              if (e.results[i].isFinal) {
+                const cmd = commandFromSpeech(text);
+                log("speech_final", { text, cmd });
+                if (cmd) useCommand(cmd, "voice");
+                else state.message = "Not recognized. Say Attack, Defence, or Ultimate.";
+              }
+            }
+          };
+
+          note.textContent = "Voice is supported. Press microphone to play.";
+        }
+
+        micButton.onclick = () => {
+          if (!recognition) return;
+          try {
+            if (listening) recognition.stop();
+            else recognition.start();
+          } catch (e) {
+            note.textContent = "Could not start microphone. Reload or use A/D/U.";
+          }
+        };
+
+        document.getElementById("attack").onclick = () => useCommand("attack", "button");
+        document.getElementById("defence").onclick = () => useCommand("defence", "button");
+        document.getElementById("ultimate").onclick = () => useCommand("ultimate", "button");
+        document.getElementById("restart").onclick = reset;
+
+        window.addEventListener("keydown", (e) => {
+          const k = e.key.toLowerCase();
+          if (k === "a") useCommand("attack", "keyboard");
+          if (k === "d") useCommand("defence", "keyboard");
+          if (k === "u") useCommand("ultimate", "keyboard");
+          if (k === "r") reset();
+        });
+
+        setupSpeech();
+        requestAnimationFrame(loop);
+      })();
+    </script>
   </body>
 </html>
