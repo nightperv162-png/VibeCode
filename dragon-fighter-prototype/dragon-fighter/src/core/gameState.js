@@ -15,6 +15,11 @@ export function createInitialGameState(config) {
     latestPlayerCommand: config.labels.noPlayerCommand,
     latestAiCommand: config.labels.noAiCommand,
     lastCommandResult: null,
+    result: null,
+    ai: {
+      actionTimerSeconds: config.ai.initialActionTimerSeconds,
+      defensiveReactionSeconds: config.math.zero
+    },
     players: {
       player1: createSideState({
         id: 'player1',
@@ -77,7 +82,17 @@ export function confirmDragonSelection(state, config) {
 
   return {
     ...state,
-    phase: config.match.staticArenaPhase,
+    phase: config.match.countdownPhase,
+    countdownSeconds: config.match.countdownSeconds,
+    timerSeconds: config.match.durationSeconds,
+    result: null,
+    latestPlayerCommand: config.labels.noPlayerCommand,
+    latestAiCommand: config.labels.noAiCommand,
+    lastCommandResult: null,
+    ai: {
+      actionTimerSeconds: config.ai.initialActionTimerSeconds,
+      defensiveReactionSeconds: config.math.zero
+    },
     players: {
       ...state.players,
       player1: {

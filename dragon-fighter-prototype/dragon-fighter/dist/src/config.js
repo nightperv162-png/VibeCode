@@ -39,7 +39,11 @@ export const CONFIG = {
     // Enables state creation logs. Recommended: true during early milestones.
     stateEvents: true,
     // Enables pointer selection logs. Recommended: true while tuning Canvas hit areas.
-    inputEvents: true
+    inputEvents: true,
+    // Enables match phase and result logs. Recommended: true during Milestone 3 validation.
+    matchEvents: true,
+    // Enables AI decision logs. Recommended: true while tuning opponent behavior.
+    aiEvents: true
   },
   math: {
     // Zero value used for empty timers and origin math. Recommended: keep at 0.
@@ -84,12 +88,22 @@ export const CONFIG = {
     initialPhase: 'dragon-select',
     // Static arena phase shown after the player confirms a dragon. Recommended: static-arena.
     staticArenaPhase: 'static-arena',
-    // Phase that accepts combat commands in Milestone 2. Recommended: match the current arena phase until countdown arrives.
-    activeCombatPhase: 'static-arena',
+    // Countdown phase shown after dragon selection. Recommended: countdown.
+    countdownPhase: 'countdown',
+    // Phase that accepts combat commands. Recommended: active-match.
+    activeCombatPhase: 'active-match',
+    // Result phase shown after defeat or timer end. Recommended: result.
+    resultPhase: 'result',
     // Whether simultaneous defeat creates a draw in later milestones. Recommended: true.
     drawOnSimultaneousDefeat: true,
     // Whether equal HP at timer end creates a draw in later milestones. Recommended: true.
-    timerTieIsDraw: true
+    timerTieIsDraw: true,
+    // Result shown when Player 1 wins. Recommended: Win.
+    winLabel: 'Win',
+    // Result shown when Player 1 loses. Recommended: Lose.
+    loseLabel: 'Lose',
+    // Result shown when neither side wins. Recommended: Draw.
+    drawLabel: 'Draw'
   },
   actions: {
     // Full spoken command for basic damage. Prototype value: Attack.
@@ -140,6 +154,8 @@ export const CONFIG = {
     pointerSelectEvent: 'pointerup',
     // Keyboard event used for command shortcuts. Recommended: keydown.
     keyboardCommandEvent: 'keydown',
+    // Keyboard key used to restart from result. Recommended: r.
+    restartKey: 'r',
     // Minimum voice confidence for accepting speech. Recommended range: 0.5-0.95.
     voiceConfidenceThreshold: 0.75,
     // Failed command display duration in seconds. Recommended range: 1-3.
@@ -159,7 +175,9 @@ export const CONFIG = {
     // Relative future Block preference. Recommended range: 1-10.
     blockWeight: 2,
     // Relative future Skill preference. Recommended range: 1-10.
-    skillWeight: 3
+    skillWeight: 3,
+    // AI timer value used immediately after match start. Recommended: same as actionIntervalSeconds.
+    initialActionTimerSeconds: 2
   },
   labels: {
     // Browser title and optional diagnostic label. Recommended: short title text.
@@ -213,7 +231,15 @@ export const CONFIG = {
     // Feedback shown when Confirm is pressed without a selected dragon. Recommended: clear short warning.
     dragonSelectBlockedFeedback: 'Choose a dragon first.',
     // Small display heading for future-only modifiers. Recommended: short label.
-    futureBonusLabel: 'Future modifier'
+    futureBonusLabel: 'Future modifier',
+    // Countdown final cue shown when active play begins. Recommended: Fight!
+    fightLabel: 'Fight!',
+    // Result overlay title prefix. Recommended: Result.
+    resultTitle: 'Result',
+    // Restart button text. Recommended: Restart.
+    restartLabel: 'Restart',
+    // Restart hint shown on result overlay. Recommended: short command hint.
+    restartHint: 'Press R or tap Restart'
   },
   colors: {
     // Main canvas background color. Recommended: readable dark or mid-tone value.
@@ -277,7 +303,9 @@ export const CONFIG = {
     // Canvas combat button blocked fill. Recommended: muted warning color.
     combatButtonBlockedFill: 'rgba(99, 61, 42, 0.94)',
     // Canvas combat button border color. Recommended: bright readable accent.
-    combatButtonBorder: '#87d5ff'
+    combatButtonBorder: '#87d5ff',
+    // Result overlay button fill. Recommended: saturated readable accent.
+    restartButtonFill: '#2f9e74'
   },
   fonts: {
     // Font family used for Canvas text. Recommended: system-safe sans-serif stack.
@@ -443,7 +471,21 @@ export const CONFIG = {
     // Canvas combat button horizontal gap in pixels. Recommended range: 8-20.
     combatButtonGap: 14,
     // Cooldown decimal places shown in HUD and buttons. Recommended range: 0-1.
-    cooldownDisplayDecimals: 1
+    cooldownDisplayDecimals: 1,
+    // Result overlay restart button x position in pixels. Recommended range: 520-620.
+    restartButtonX: 548,
+    // Result overlay restart button y position in pixels. Recommended range: 430-510.
+    restartButtonY: 462,
+    // Result overlay restart button width in pixels. Recommended range: 160-240.
+    restartButtonWidth: 184,
+    // Result overlay restart button height in pixels. Recommended range: 48-72.
+    restartButtonHeight: 58,
+    // Result overlay title y position in pixels. Recommended range: 220-300.
+    resultTitleY: 268,
+    // Result overlay body y position in pixels. Recommended range: 300-380.
+    resultBodyY: 340,
+    // Countdown overlay text y position in pixels. Recommended range: 300-400.
+    countdownOverlayY: 356
   },
   dragons: {
     // Enemy dragon used in the static arena until AI selection exists. Recommended: stable placeholder data.

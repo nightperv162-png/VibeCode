@@ -12,4 +12,6 @@
 - Dragon Select has exactly three display-only dragons: Ember, Tide, and Volt. Their future modifiers are config placeholders only and do not affect combat yet.
 - Milestone 2 uses one shared command path for keyboard and Canvas button inputs.
 - Dragon role modifiers remain display/config placeholders only; Attack, Defence, Block, Skill values still come from base action config.
-- The post-select arena phase `static-arena` is the active combat phase until Milestone 3 adds countdown and match states.
+- Milestone 3 phase flow is `dragon-select` -> `countdown` -> `active-match` -> `result`.
+- Restart keeps the selected dragon and resets HP, timer, cooldowns, labels, latest feedback, AI timers, and result state.
+- AI uses the same command path as the player, acts every 2 seconds during active match, prefers Attack when available, and may react defensively after player Skill.

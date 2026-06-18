@@ -13,6 +13,7 @@ export function createCanvasRenderer(config) {
     drawArena(context);
     drawTeams(context, state);
     drawHud(context, state);
+    drawOverlay(context, state);
   }
 
   function drawBackground(context) {
@@ -103,7 +104,7 @@ export function createCanvasRenderer(config) {
     const rect = layoutData.timerRect;
     drawPanel(context, rect, config.colors.colorPanelBackground);
     drawText(context, config.labels.timerTitle, rect.x + rect.width * config.math.half, rect.y + config.layout.panelTitleY, config.fonts.uiFontSizeSmall, config.fonts.boldWeight, config.colors.colorTextSecondary, 'center');
-    drawText(context, `${state.countdownSeconds} / ${state.timerSeconds}`, rect.x + rect.width * config.math.half, rect.y + config.layout.commandTextY, config.fonts.uiFontSizeMedium, config.fonts.boldWeight, config.colors.colorTextPrimary, 'center');
+    drawText(context, formatTimerText(state), rect.x + rect.width * config.math.half, rect.y + config.layout.commandTextY, config.fonts.uiFontSizeMedium, config.fonts.boldWeight, config.colors.colorTextPrimary, 'center');
   }
 
   function drawCommandPanel(context, rect, title, value) {
@@ -147,6 +148,35 @@ export function createCanvasRenderer(config) {
 
     drawText(context, state.dragonSelect.feedback, config.canvas.width * config.math.half, config.layout.dragonSelectFeedbackY, config.fonts.uiFontSizeMedium, config.fonts.boldWeight, state.dragonSelect.selectedDragonId ? config.colors.colorTextSecondary : config.colors.colorTextWarning, 'center');
     drawConfirmButton(context, state);
+  }
+
+  function drawOverlay(context, state) {
+    if (state.phase === config.match.countdownPhase) {
+      drawTint(context);
+      const label = state.countdownSeconds > config.math.zero
+        ? Math.ceil(state.countdownSeconds).toString()
+        : config.labels.fightLabel;
+      drawText(context, label, config.canvas.width * config.math.half, config.layout.countdownOverlayY, config.fonts.uiFontSizeLarge, config.fonts.boldWeight, config.colors.colorTextPrimary, 'center');
+      return;
+    }
+
+    if (state.phase === config.match.resultPhase) {
+      drawTint(context);
+      drawText(context, `${config.labels.resultTitle}: ${state.result}`, config.canvas.width * config.math.half, config.layout.resultTitleY, config.fonts.uiFontSizeLarge, config.fonts.boldWeight, config.colors.colorTextPrimary, 'center');
+      drawText(context, config.labels.restartHint, config.canvas.width * config.math.half, config.layout.resultBodyY, config.fonts.uiFontSizeMedium, config.fonts.normalWeight, config.colors.colorTextSecondary, 'center');
+      drawRestartButton(context);
+    }
+  }
+
+  function drawRestartButton(context) {
+    const rect = layoutData.restartButtonRect;
+    drawPanel(context, rect, config.colors.restartButtonFill, config.colors.colorPanelBorder);
+    drawText(context, config.labels.restartLabel, rect.x + rect.width * config.math.half, rect.y + config.layout.commandTextY, config.fonts.uiFontSizeMedium, config.fonts.boldWeight, config.colors.colorTextPrimary, 'center');
+  }
+
+  function drawTint(context) {
+    context.fillStyle = config.colors.overlayBackgroundColor;
+    context.fillRect(config.math.zero, config.math.zero, config.canvas.width, config.canvas.height);
   }
 
   function drawDragonOptionCard(context, dragon, rect, isSelected) {
@@ -242,6 +272,14 @@ export function createCanvasRenderer(config) {
     return remaining > config.math.zero
       ? remaining.toFixed(config.layout.cooldownDisplayDecimals)
       : config.labels.cooldownReadyLabel;
+  }
+
+  function formatTimerText(state) {
+    if (state.phase === config.match.countdownPhase) {
+      return Math.ceil(state.countdownSeconds).toString();
+    }
+
+    return Math.ceil(state.timerSeconds).toString();
   }
 
   return { render, layoutData };

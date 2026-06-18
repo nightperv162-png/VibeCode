@@ -38,11 +38,11 @@ test('confirm without selection does not transition', () => {
   assert.equal(state.dragonSelect.feedback, CONFIG.labels.dragonSelectBlockedFeedback);
 });
 
-test('confirm with selection transitions to static arena screen', () => {
+test('confirm with selection transitions to countdown before arena combat', () => {
   const selectedState = selectDragon(createInitialGameState(CONFIG), CONFIG, 'volt');
   const state = confirmDragonSelection(selectedState, CONFIG);
 
-  assert.equal(state.phase, CONFIG.match.staticArenaPhase);
+  assert.equal(state.phase, CONFIG.match.countdownPhase);
 });
 
 test('selected dragon is used as Player 1 dragon data', () => {

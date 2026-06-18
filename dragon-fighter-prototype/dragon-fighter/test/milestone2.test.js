@@ -4,14 +4,15 @@ import { CONFIG } from '../src/config.js';
 import { attemptCommand } from '../src/combat/actions.js';
 import { updateCombatTimers } from '../src/combat/cooldowns.js';
 import { resolveIncomingDamage } from '../src/combat/damageResolver.js';
+import { updateMatchFlow } from '../src/combat/matchRules.js';
 import { confirmDragonSelection, createInitialGameState, selectDragon } from '../src/core/gameState.js';
 import { mapCanvasCommand, mapKeyboardCommand, normalizeCommand } from '../src/input/inputMapper.js';
 
 function createActiveState() {
-  return confirmDragonSelection(
+  return updateMatchFlow(confirmDragonSelection(
     selectDragon(createInitialGameState(CONFIG), CONFIG, CONFIG.dragons.options[CONFIG.math.zero].id),
     CONFIG
-  );
+  ), CONFIG, CONFIG.match.countdownSeconds);
 }
 
 test('command mapping accepts complete command words', () => {

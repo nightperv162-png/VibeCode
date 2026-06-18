@@ -1,10 +1,16 @@
 import { confirmDragonSelection, selectDragon } from '../core/gameState.js';
 import { attemptCommand } from '../combat/actions.js';
+import { restartMatch } from '../combat/matchRules.js';
 import { mapCanvasCommand } from './inputMapper.js';
 
 export function registerPointerInput({ canvas, config, layoutData, state, logger }) {
   canvas.addEventListener(config.input.pointerSelectEvent, (event) => {
     const point = toCanvasPoint(canvas, config, event);
+
+    if (state.phase === config.match.resultPhase) {
+      handleRestartButton(point, config, layoutData, state, logger);
+      return;
+    }
 
     if (state.phase !== config.match.initialPhase) {
       handleCombatButton(point, config, layoutData, state, logger);
@@ -24,6 +30,15 @@ export function registerPointerInput({ canvas, config, layoutData, state, logger
       logger.log('inputEvents', 'dragon select confirm', { phase: state.phase });
     }
   });
+}
+
+function handleRestartButton(point, config, layoutData, state, logger) {
+  if (!containsPoint(layoutData.restartButtonRect, point)) {
+    return;
+  }
+
+  Object.assign(state, restartMatch(state, config));
+  logger.log('inputEvents', 'match restarted', { phase: state.phase });
 }
 
 function handleCombatButton(point, config, layoutData, state, logger) {

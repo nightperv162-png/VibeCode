@@ -18,6 +18,8 @@
 - `src/combat/actions.js`
 - `src/combat/cooldowns.js`
 - `src/combat/damageResolver.js`
+- `src/combat/matchRules.js`
+- `src/ai/aiController.js`
 - `package.json`
 - `index.html`
 - `scripts/build.js`
@@ -31,13 +33,14 @@
 - `src/render/canvasRenderer.js`
 - `test/milestone1.test.js`
 - `test/milestone2.test.js`
+- `test/milestone3.test.js`
 - `docs/project_memory.md`
 - `docs/agent_state.md`
 - `docs/work_log.md`
 
 ### Tested
 
-- `npm.cmd test` passed: 24 tests, 24 pass.
+- `npm.cmd test` passed: 35 tests, 35 pass.
 - `npm.cmd run build` passed and generated `dist`.
 - Dev server check passed with HTTP 200 at `http://localhost:5173`.
-- In-app browser verification was attempted for Milestone 2 but blocked by sandbox read ACL errors while loading the Browser plugin client.
+- In-app browser verification was attempted for Milestone 3 but blocked by sandbox read ACL errors while loading the Browser plugin client.

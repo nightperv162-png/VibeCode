@@ -5,6 +5,10 @@ export function updateCombatTimers(state, config, deltaSeconds) {
 
   return {
     ...state,
+    ai: {
+      ...state.ai,
+      defensiveReactionSeconds: Math.max(config.math.zero, state.ai.defensiveReactionSeconds - deltaSeconds)
+    },
     players: Object.fromEntries(
       Object.entries(state.players).map(([sideId, side]) => [sideId, updateSideTimers(side, config, deltaSeconds)])
     )

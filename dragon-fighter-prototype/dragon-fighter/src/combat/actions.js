@@ -1,4 +1,5 @@
 import { clampHp, resolveIncomingDamage } from './damageResolver.js';
+import { applyResultIfNeeded } from './matchRules.js';
 import { normalizeCommand } from '../input/inputMapper.js';
 
 export function getActionDefinition(config, command) {
@@ -85,12 +86,18 @@ export function attemptCommand(state, config, actorId, rawCommand) {
     };
   }
 
-  return {
+  const nextState = {
     ...state,
     players: {
       ...state.players,
       [actorId]: nextActor,
       [targetId]: nextTarget
+    },
+    ai: {
+      ...state.ai,
+      defensiveReactionSeconds: actorId === 'player1' && command === config.actions.skillCommandWord
+        ? config.ai.defensiveReactionWindowSeconds
+        : state.ai.defensiveReactionSeconds
     },
     latestPlayerCommand: actorId === 'player1' ? command : state.latestPlayerCommand,
     latestAiCommand: actorId === 'player2' ? command : state.latestAiCommand,
@@ -101,6 +108,8 @@ export function attemptCommand(state, config, actorId, rawCommand) {
       reason: config.labels.successReason
     }
   };
+
+  return applyResultIfNeeded(nextState, config);
 }
 
 function applyFailure(state, config, actorId, reason, command = null) {

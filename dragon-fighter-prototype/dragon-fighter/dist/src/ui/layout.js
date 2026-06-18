@@ -69,7 +69,13 @@ export function createLayout(config) {
       y: layout.player2DragonPositionY
     },
     dragonSelect: createDragonSelectLayout(config),
-    combatButtonRects: createCombatButtonRects(config)
+    combatButtonRects: createCombatButtonRects(config),
+    restartButtonRect: {
+      x: layout.restartButtonX,
+      y: layout.restartButtonY,
+      width: layout.restartButtonWidth,
+      height: layout.restartButtonHeight
+    }
   };
 }
 
