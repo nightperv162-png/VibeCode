@@ -6,7 +6,7 @@ These local files are private Dragon Fighter prototype placeholders sourced from
 
 ## Files
 
-- `fire-dragon-adult.jpg` - Fire Dragon page: https://dragon-mania-legends.fandom.com/wiki/Fire_Dragon
+- `fire-dragon-adult.png` - Fire Dragon page: https://dragon-mania-legends.fandom.com/wiki/Fire_Dragon
 - `holy-paladin-dragon-adult.png` - Holy Paladin Dragon page: https://dragon-mania-legends.fandom.com/wiki/Holy_Paladin_Dragon
 - `moss-boss-dragon-adult.png` - Moss boss dragon page: https://dragon-mania-legends.fandom.com/wiki/Moss_boss_dragon
 - `moss-boss-dragon-enemy.png` - Moss boss dragon page: https://dragon-mania-legends.fandom.com/wiki/Moss_boss_dragon

@@ -5,8 +5,8 @@ export const DRAGON_IMAGE_MANIFEST = {
   fireDragonAdult: {
     key: 'fireDragonAdult',
     displayName: 'Fire Dragon adult',
-    path: 'public/assets/dragons/fire-dragon-adult.jpg',
-    localFile: 'fire-dragon-adult.jpg',
+    path: 'public/assets/dragons/fire-dragon-adult.png',
+    localFile: 'fire-dragon-adult.png',
     sourcePageTitle: 'Fire Dragon',
     sourcePageUrl: 'https://dragon-mania-legends.fandom.com/wiki/Fire_Dragon',
     sourceFileName: 'File:Fire Dragon adult.jpg',
