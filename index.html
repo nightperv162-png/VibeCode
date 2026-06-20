@@ -1,0 +1,1205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dragon Fighter</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0b1020;
+        overflow: hidden;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+      }
+
+      canvas {
+        aspect-ratio: 16 / 9;
+        background: #17223a;
+        border: 3px solid #f6c453;
+        border-radius: 20px;
+        box-sizing: border-box;
+        box-shadow: 0 20px 70px #0009;
+        display: block;
+        max-height: 100vh;
+        touch-action: none;
+        width: min(1100px, 100vw);
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game" width="1100" height="620"></canvas>
+
+    <script>
+      (() => {
+        const canvas = document.getElementById("game");
+        const ctx = canvas.getContext("2d");
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const svgDataUri = (svg) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+        const cfg = {
+          matchTime: 60,
+          maxHp: 100,
+          baseAttackDamage: 12,
+          ultimateDamage: 35,
+          enemyDamage: 10,
+          attackCd: 1.0,
+          defenceCd: 4.0,
+          blockCd: 7.0,
+          ultimateCd: 9.0,
+          baseDefenceTime: 3.0,
+          defenceReduce: 0.5,
+          blockActiveTime: 1.0,
+          castWarningTime: 0.35,
+          projectileTravelTime: 0.65,
+          enemyMinWait: 1.3,
+          enemyMaxWait: 2.4,
+          assets: {
+            background: "./dragon-fighter-prototype/dragon-fighter/public/assets/backgrounds/arena.png",
+            enemy: "./dragon-fighter-prototype/dragon-fighter/public/assets/dragons/moss-boss-dragon-enemy.png",
+            projectileAttack: svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 90"><defs><linearGradient id="flame" x1="0" x2="1"><stop stop-color="#7c2d12"/><stop offset=".5" stop-color="#fb923c"/><stop offset="1" stop-color="#fff7cc"/></linearGradient></defs><path fill="#fb923c" opacity=".42" d="M8 45 72 12 58 36l50 9-50 9 14 24z"/><path fill="url(#flame)" stroke="#fff1b8" stroke-width="4" d="M48 45c22-31 74-32 112 0-38 32-90 31-112 0Z"/><ellipse cx="130" cy="36" rx="14" ry="7" fill="#fff" opacity=".75"/></svg>`),
+            projectileUltimate: svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 110"><defs><radialGradient id="core"><stop stop-color="#fff"/><stop offset=".35" stop-color="#c4b5fd"/><stop offset="1" stop-color="#6d28d9"/></radialGradient></defs><path fill="#8b5cf6" opacity=".4" d="m6 55 82-45-22 34 72 11-72 11 22 34z"/><path fill="#4c1d95" stroke="#ddd6fe" stroke-width="5" d="M56 55c27-42 91-47 142 0-51 47-115 42-142 0Z"/><ellipse cx="142" cy="55" rx="38" ry="31" fill="url(#core)"/><path fill="none" stroke="#fff" stroke-width="5" opacity=".8" d="m132 35 18 13-13 9 16 17"/></svg>`)
+          },
+          facing: {
+            player: { flip: true, direction: "left" },
+            enemy: { flip: false, direction: "right" }
+          },
+          elements: {
+            ember: { icon: "F", color: "#fb923c" },
+            tide: { icon: "D", color: "#60a5fa" },
+            moss: { icon: "M", color: "#34d399" },
+            enemy: { icon: "M", color: "#a855f7" }
+          },
+          dragons: [
+            {
+              id: "ember",
+              name: "Ember",
+              role: "Attack Focus",
+              flavor: "A close-range striker that burns battles down fast.",
+              asset: "./dragon-fighter-prototype/dragon-fighter/public/assets/dragons/fire-dragon-adult.png",
+              modifiers: {
+                attackDamage: 1.2,
+                defenceDuration: 0.85,
+                skillCooldown: 1
+              }
+            },
+            {
+              id: "tide",
+              name: "Tide",
+              role: "Defence Focus",
+              flavor: "A patient guardian that turns pressure into survival.",
+              asset: "./dragon-fighter-prototype/dragon-fighter/public/assets/dragons/holy-paladin-dragon-adult.png",
+              modifiers: {
+                attackDamage: 0.9,
+                defenceDuration: 1.25,
+                skillCooldown: 1
+              }
+            },
+            {
+              id: "moss",
+              name: "Moss",
+              role: "Balanced",
+              flavor: "A steady duelist with reliable rhythm and tempo.",
+              asset: "./dragon-fighter-prototype/dragon-fighter/public/assets/dragons/moss-boss-dragon-adult.png",
+              modifiers: {
+                attackDamage: 1,
+                defenceDuration: 1,
+                skillCooldown: 0.95
+              }
+            }
+          ],
+          dragonSelect: {
+            titleY: 70,
+            subtitleY: 108,
+            cardY: 145,
+            cardW: 310,
+            cardH: 330,
+            cardGap: 30,
+            firstCardX: 70,
+            imageY: 252,
+            imageW: 195,
+            imageH: 140,
+            confirm: { x: 415, y: 510, w: 270, h: 48 }
+          },
+          battleLayout: {
+            playerDragon: { x: 360, y: 390, w: 358, h: 253, labelY: 226, hitX: 385, hitY: 370 },
+            enemyDragon: { x: 766, y: 312, w: 170, h: 124, labelY: 204, hitX: 750, hitY: 300 },
+            playerHud: { x: 22, y: 12, w: 390, h: 128 },
+            enemyHud: { x: 688, y: 12, w: 390, h: 128 },
+            timer: { x: 465, y: 18, w: 170, h: 78 },
+            message: { x: 342, y: 144, w: 416, h: 40, textX: 550, textY: 169 },
+            mic: { x: 45, y: 168 },
+            playerCommand: { x: 28, y: 474, w: 308, h: 58 },
+            commandReference: { x: 358, y: 474, w: 384, h: 58 },
+            enemyCommand: { x: 764, y: 474, w: 308, h: 58 }
+          }
+        };
+
+        function getDragonById(config, dragonId) {
+          return config.dragons.find((dragon) => dragon.id === dragonId) || null;
+        }
+
+        function getSelectedDragon(config, currentState) {
+          return getDragonById(config, currentState.selectedDragonId);
+        }
+
+        function createInitialState(config) {
+          return {
+            phase: "select",
+            selectedDragonId: null,
+            time: config.matchTime,
+            playerHp: config.maxHp,
+            enemyHp: config.maxHp,
+            lastHeard: "-",
+            accepted: "-",
+            enemyAccepted: "-",
+            playerState: "Choose",
+            enemyState: "Ready",
+            message: "Choose your dragon.",
+            note: "Select a dragon, then confirm to battle.",
+            result: "",
+            cd: { attack: 0, defence: 0, block: 0, ultimate: 0 },
+            defenceTimer: 0,
+            blockTimer: 0,
+            enemyTimer: 1.6,
+            shake: 0,
+            particles: [],
+            pendingAttacks: []
+          };
+        }
+
+        function modifiedAttackDamage(config, currentState) {
+          const dragon = getSelectedDragon(config, currentState);
+          return Math.round(config.baseAttackDamage * dragon.modifiers.attackDamage);
+        }
+
+        function modifiedDefenceDuration(config, currentState) {
+          const dragon = getSelectedDragon(config, currentState);
+          return config.baseDefenceTime * dragon.modifiers.defenceDuration;
+        }
+
+        function modifiedSkillCooldown(config, currentState) {
+          const dragon = getSelectedDragon(config, currentState);
+          return config.ultimateCd * dragon.modifiers.skillCooldown;
+        }
+
+        function getCommandCooldown(config, currentState, command) {
+          if (command === "attack") return config.attackCd;
+          if (command === "defence") return config.defenceCd;
+          if (command === "block") return config.blockCd;
+          if (command === "ultimate") return modifiedSkillCooldown(config, currentState);
+          return 0;
+        }
+
+        function getBattleRenderData(config, currentState) {
+          const selected = getSelectedDragon(config, currentState);
+          return {
+            player: {
+              assetKey: selected.id,
+              name: selected.name,
+              role: selected.role,
+              flip: config.facing.player.flip,
+              direction: config.facing.player.direction
+            },
+            enemy: {
+              assetKey: "enemy",
+              name: "Enemy Dragon",
+              role: "Rival",
+              flip: config.facing.enemy.flip,
+              direction: config.facing.enemy.direction
+            }
+          };
+        }
+
+        const core = {
+          getSelectedDragon,
+          modifiedAttackDamage,
+          modifiedDefenceDuration,
+          getCommandCooldown,
+          getBattleRenderData
+        };
+        const state = createInitialState(cfg);
+
+        const images = {};
+        const buttons = [];
+        let recognition = null;
+        let listening = false;
+        let micRequested = false;
+        let recognitionRestartTimer = null;
+        let speechError = "";
+        let lastVoiceCommand = { signature: "", at: 0 };
+        let last = performance.now();
+
+        const rand = (a, b) => a + Math.random() * (b - a);
+        const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+        const log = (name, data = {}) => console.log("[DragonFighter]", name, data);
+
+        function loadImage(key, src) {
+          const image = new Image();
+          image.onload = () => log("asset_loaded", { key, src });
+          image.onerror = () => log("asset_failed", { key, src });
+          image.src = src;
+          images[key] = image;
+        }
+
+        Object.entries(cfg.assets).forEach(([key, src]) => loadImage(key, src));
+        cfg.dragons.forEach((dragon) => loadImage(dragon.id, dragon.asset));
+
+        function reset() {
+          state.phase = "playing";
+          state.time = cfg.matchTime;
+          state.playerHp = cfg.maxHp;
+          state.enemyHp = cfg.maxHp;
+          state.lastHeard = "-";
+          state.accepted = "-";
+          state.enemyAccepted = "-";
+          state.playerState = "Ready";
+          state.enemyState = "Ready";
+          state.message = "Battle started. Say Attack, Defence, Block, Ultimate, or Skill.";
+          state.note = "Use canvas buttons, keyboard, or voice commands.";
+          state.result = "";
+          state.cd.attack = 0;
+          state.cd.defence = 0;
+          state.cd.block = 0;
+          state.cd.ultimate = 0;
+          state.defenceTimer = 0;
+          state.blockTimer = 0;
+          state.enemyTimer = rand(cfg.enemyMinWait, cfg.enemyMaxWait);
+          state.shake = 0;
+          state.particles = [];
+          state.pendingAttacks = [];
+          log("reset");
+        }
+
+        function chooseDragonAgain() {
+          state.phase = "select";
+          state.selectedDragonId = null;
+          state.time = cfg.matchTime;
+          state.playerHp = cfg.maxHp;
+          state.enemyHp = cfg.maxHp;
+          state.lastHeard = "-";
+          state.accepted = "-";
+          state.enemyAccepted = "-";
+          state.playerState = "Choose";
+          state.enemyState = "Ready";
+          state.message = "Choose your dragon.";
+          state.note = "Select a dragon, then confirm to battle.";
+          state.result = "";
+          state.cd.attack = 0;
+          state.cd.defence = 0;
+          state.cd.block = 0;
+          state.cd.ultimate = 0;
+          state.defenceTimer = 0;
+          state.blockTimer = 0;
+          state.enemyTimer = rand(cfg.enemyMinWait, cfg.enemyMaxWait);
+          state.shake = 0;
+          state.particles = [];
+          state.pendingAttacks = [];
+          log("choose_dragon_again");
+        }
+
+        function normalize(text) {
+          return String(text || "")
+            .toLowerCase()
+            .replace(/[.,!?;:]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        }
+
+        function commandFromSpeech(text) {
+          const words = normalize(text).split(" ").filter(Boolean);
+          for (const word of words) {
+            if (word === "attack") return "attack";
+            if (word === "block") return "block";
+            if (word === "defence" || word === "defense") return "defence";
+            if (word === "ultimate" || word === "skill") return "ultimate";
+          }
+          return null;
+        }
+
+        function confirmDragon() {
+          const dragon = core.getSelectedDragon(cfg, state);
+          if (!dragon) {
+            state.note = "Pick a dragon first.";
+            return;
+          }
+          state.phase = "playing";
+          state.message = `${dragon.name} enters battle.`;
+          state.note = "Use canvas buttons, keyboard, or voice commands.";
+          state.playerState = dragon.role;
+          state.enemyState = "Ready";
+          state.accepted = "-";
+          state.enemyAccepted = "-";
+          state.pendingAttacks = [];
+          log("dragon_confirmed", { dragonId: dragon.id, role: dragon.role });
+        }
+
+        function scheduleAttack(source, target, command, damage, color, size) {
+          const sourceLayout = source === "player" ? cfg.battleLayout.playerDragon : cfg.battleLayout.enemyDragon;
+          const targetLayout = target === "player" ? cfg.battleLayout.playerDragon : cfg.battleLayout.enemyDragon;
+          state.pendingAttacks.push({
+            source,
+            target,
+            command,
+            damage,
+            color,
+            size,
+            assetKey: command === "ultimate" ? "projectileUltimate" : "projectileAttack",
+            elapsed: 0,
+            castTime: cfg.castWarningTime,
+            travelTime: cfg.projectileTravelTime,
+            startX: sourceLayout.hitX,
+            startY: sourceLayout.hitY - 28,
+            endX: targetLayout.hitX,
+            endY: targetLayout.hitY - 18
+          });
+          hit(sourceLayout.hitX, sourceLayout.hitY - 28, color, command === "ultimate" ? 14 : 8);
+        }
+
+        function resolveAttack(attack) {
+          const targetLayout = attack.target === "player" ? cfg.battleLayout.playerDragon : cfg.battleLayout.enemyDragon;
+          const blocked = attack.target === "player" && state.blockTimer > 0;
+          const defended = attack.target === "player" && state.defenceTimer > 0;
+
+          if (blocked) {
+            state.playerState = "Blocked";
+            state.message = "Block negated all damage.";
+            shield(targetLayout.hitX, targetLayout.hitY, "#f6c453", 22);
+            hit(targetLayout.hitX, targetLayout.hitY, "#f6c453", 10);
+            log("attack_blocked", { command: attack.command, source: attack.source });
+            return;
+          }
+
+          const damage = attack.target === "player" && defended ? Math.round(attack.damage * cfg.defenceReduce) : attack.damage;
+
+          if (attack.target === "player") {
+            state.playerHp = clamp(state.playerHp - damage, 0, cfg.maxHp);
+            state.playerState = defended ? "Defended" : "Hit";
+            state.message = defended ? `Defence reduced damage. You -${damage} HP` : `Enemy hit. You -${damage} HP`;
+          } else {
+            state.enemyHp = clamp(state.enemyHp - damage, 0, cfg.maxHp);
+            state.enemyState = attack.command === "ultimate" ? "Crushed" : "Hit";
+            state.message = attack.command === "ultimate" ? `Ultimate hit. Enemy -${damage} HP` : `Attack hit. Enemy -${damage} HP`;
+          }
+
+          hit(targetLayout.hitX, targetLayout.hitY, attack.color, attack.command === "ultimate" ? 40 : 18);
+          state.shake = attack.command === "ultimate" ? 0.3 : 0.16;
+          log("attack_impact", { command: attack.command, source: attack.source, target: attack.target, damage, defended });
+          checkEnd();
+        }
+
+        function useCommand(cmd, source = "button") {
+          if (state.phase !== "playing") return;
+
+          state.accepted = cmd.toUpperCase();
+          log("command", { cmd, source });
+
+          if (state.cd[cmd] > 0) {
+            state.message = `${cmd.toUpperCase()} cooldown: ${state.cd[cmd].toFixed(1)}s`;
+            state.playerState = "Cooldown";
+            return;
+          }
+
+          if (cmd === "attack") {
+            const damage = core.modifiedAttackDamage(cfg, state);
+            state.cd.attack = core.getCommandCooldown(cfg, state, "attack");
+            state.playerState = "Attack Cast";
+            state.enemyState = "Incoming";
+            state.message = "Attack charging. Projectile incoming.";
+            scheduleAttack("player", "enemy", "attack", damage, "#fb923c", 18);
+          }
+
+          if (cmd === "defence") {
+            const duration = core.modifiedDefenceDuration(cfg, state);
+            state.cd.defence = core.getCommandCooldown(cfg, state, "defence");
+            state.defenceTimer = duration;
+            state.playerState = "Defence";
+            state.message = `Defence shield active for ${duration.toFixed(1)} seconds`;
+            shield(cfg.battleLayout.playerDragon.hitX, cfg.battleLayout.playerDragon.hitY, "#60a5fa", 28);
+          }
+
+          if (cmd === "block") {
+            state.cd.block = core.getCommandCooldown(cfg, state, "block");
+            state.blockTimer = cfg.blockActiveTime;
+            state.playerState = "Block";
+            state.message = `Block active for ${cfg.blockActiveTime.toFixed(1)} seconds`;
+            shield(cfg.battleLayout.playerDragon.hitX, cfg.battleLayout.playerDragon.hitY, "#f6c453", 18);
+          }
+
+          if (cmd === "ultimate") {
+            state.cd.ultimate = core.getCommandCooldown(cfg, state, "ultimate");
+            state.playerState = "Ultimate Cast";
+            state.enemyState = "Danger";
+            state.message = "Ultimate charging. Heavy projectile incoming.";
+            scheduleAttack("player", "enemy", "ultimate", cfg.ultimateDamage, "#a78bfa", 32);
+          }
+        }
+
+        function startRecognition() {
+          if (!recognition || listening || !micRequested) return;
+
+          try {
+            recognition.start();
+          } catch (e) {
+            state.note = "Microphone is busy. Retrying...";
+            clearTimeout(recognitionRestartTimer);
+            recognitionRestartTimer = setTimeout(startRecognition, 350);
+          }
+        }
+
+        function toggleMic() {
+          if (!recognition) {
+            state.note = "This browser does not support Web Speech API. Use canvas buttons or A/D/B/U/R.";
+            return;
+          }
+
+          if (micRequested) {
+            micRequested = false;
+            clearTimeout(recognitionRestartTimer);
+            if (listening) recognition.stop();
+            else state.note = "Mic is off. Press Start Mic to listen again.";
+            return;
+          }
+
+          micRequested = true;
+          speechError = "";
+          startRecognition();
+        }
+
+        function enemyAttack() {
+          if (state.phase !== "playing") return;
+
+          state.enemyState = "Attack Cast";
+          state.enemyAccepted = "ATTACK";
+          state.playerState = state.blockTimer > 0 ? "Block" : state.playerState;
+          state.message = "Enemy attack charging. Block before impact.";
+          scheduleAttack("enemy", "player", "attack", cfg.enemyDamage, "#ef4444", 18);
+          state.enemyTimer = rand(cfg.enemyMinWait, cfg.enemyMaxWait);
+          log("enemy_attack_cast");
+        }
+
+        function checkEnd() {
+          if (state.playerHp <= 0 && state.enemyHp <= 0) finish("DRAW");
+          else if (state.enemyHp <= 0) finish("YOU WIN");
+          else if (state.playerHp <= 0) finish("YOU LOSE");
+          else if (state.time <= 0) {
+            if (state.playerHp > state.enemyHp) finish("YOU WIN BY HP");
+            else if (state.enemyHp > state.playerHp) finish("YOU LOSE BY HP");
+            else finish("DRAW");
+          }
+        }
+
+        function finish(result) {
+          state.phase = "ended";
+          state.result = result;
+          state.pendingAttacks = [];
+          state.message = "Choose Dragon Again to pick a new dragon.";
+          log("finish", { result, playerHp: state.playerHp, enemyHp: state.enemyHp });
+        }
+
+        function hit(x, y, color, count) {
+          for (let i = 0; i < count; i += 1) {
+            state.particles.push({
+              x,
+              y,
+              vx: rand(-180, 180),
+              vy: rand(-150, 150),
+              life: rand(0.35, 0.8),
+              max: 0.8,
+              size: rand(4, 10),
+              color
+            });
+          }
+        }
+
+        function shield(x, y, color = "#60a5fa", count = 28) {
+          for (let i = 0; i < count; i += 1) {
+            const a = Math.PI * 2 * i / count;
+            state.particles.push({
+              x: x + Math.cos(a) * 58,
+              y: y + Math.sin(a) * 58,
+              vx: Math.cos(a) * 44,
+              vy: Math.sin(a) * 44,
+              life: 0.75,
+              max: 0.75,
+              size: 5,
+              color
+            });
+          }
+        }
+
+        function update(dt) {
+          if (state.shake > 0) state.shake -= dt;
+          ["attack", "defence", "block", "ultimate"].forEach((k) => {
+            state.cd[k] = Math.max(0, state.cd[k] - dt);
+          });
+
+          const defenceWasActive = state.defenceTimer > 0;
+          const blockWasActive = state.blockTimer > 0;
+          if (defenceWasActive) state.defenceTimer = Math.max(0, state.defenceTimer - dt);
+          if (blockWasActive) state.blockTimer = Math.max(0, state.blockTimer - dt);
+          if (blockWasActive && state.blockTimer === 0 && state.defenceTimer > 0) state.playerState = "Defence";
+          if ((defenceWasActive || blockWasActive) && state.defenceTimer === 0 && state.blockTimer === 0 && ["Defence", "Defended", "Block", "Blocked"].includes(state.playerState)) {
+            state.playerState = "Ready";
+          }
+
+          state.particles.forEach((p) => {
+            p.life -= dt;
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx *= 0.98;
+            p.vy *= 0.98;
+          });
+          state.particles = state.particles.filter((p) => p.life > 0);
+
+          if (state.phase !== "playing") return;
+
+          state.time = Math.max(0, state.time - dt);
+          state.enemyTimer -= dt;
+
+          state.pendingAttacks.forEach((attack) => {
+            attack.elapsed += dt;
+          });
+          const impacting = state.pendingAttacks.filter((attack) => attack.elapsed >= attack.castTime + attack.travelTime);
+          state.pendingAttacks = state.pendingAttacks.filter((attack) => attack.elapsed < attack.castTime + attack.travelTime);
+          impacting.forEach((attack) => {
+            if (state.phase === "playing") resolveAttack(attack);
+          });
+
+          if (state.enemyTimer <= 0) enemyAttack();
+          if (state.time <= 0) checkEnd();
+        }
+
+        function rr(x, y, w, h, r, fill, stroke) {
+          ctx.beginPath();
+          ctx.roundRect(x, y, w, h, r);
+          if (fill) {
+            ctx.fillStyle = fill;
+            ctx.fill();
+          }
+          if (stroke) {
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+        }
+
+        function hpBar(x, y, w, h, value, color, label) {
+          rr(x, y, w, h, 10, "#0008", "#ffffff33");
+          rr(x + 3, y + 3, (w - 6) * clamp(value / cfg.maxHp, 0, 1), h - 6, 8, color, null);
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 16px system-ui";
+          ctx.fillText(`${label}: ${Math.ceil(value)}/${cfg.maxHp}`, x + w / 2, y + h - 8);
+          ctx.textAlign = "left";
+        }
+
+        function canvasButton(id, x, y, w, h, label, fill, border) {
+          buttons.push({ id, x, y, w, h });
+          rr(x, y, w, h, 18, fill, border);
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 15px system-ui";
+          ctx.fillText(label, x + w / 2, y + 27);
+          ctx.textAlign = "left";
+        }
+
+        function drawControls() {
+          if (state.phase === "select") {
+            const select = cfg.dragonSelect;
+            canvasButton("confirmDragon", select.confirm.x, select.confirm.y, select.confirm.w, select.confirm.h, "Confirm Dragon", state.selectedDragonId ? "#f6c453dd" : "#475569cc", state.selectedDragonId ? "#f6c453" : "#64748b");
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#cbd5e1";
+            ctx.font = "14px system-ui";
+            ctx.fillText(state.note, 550, 610);
+            ctx.textAlign = "left";
+            return;
+          }
+
+          buttons.length = 0;
+          if (state.phase === "ended") {
+            canvasButton("chooseDragonAgain", 451, 548, 198, 44, "Choose Dragon Again", "#102a4cdd", "#87d5ff");
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#cbd5e1";
+            ctx.font = "14px system-ui";
+            ctx.fillText(state.note, 550, 610);
+            ctx.textAlign = "left";
+            return;
+          }
+
+          canvasButton("mic", 82, 548, 132, 44, micRequested ? "Stop Mic" : "Start Mic", listening ? "#164e35dd" : micRequested ? "#713f12dd" : "#f6c453dd", "#f6c453");
+          canvasButton("attack", 238, 548, 108, 44, "Attack", "#402313dd", "#fb923c");
+          canvasButton("defence", 368, 548, 108, 44, "Defence", "#16324add", "#60a5fa");
+          canvasButton("block", 498, 548, 108, 44, "Block", "#3b2b12dd", "#f6c453");
+          canvasButton("ultimate", 628, 548, 108, 44, "Ultimate", "#30215bdd", "#a78bfa");
+          canvasButton("restart", 864, 548, 148, 44, "Restart", "#102a4cdd", "#87d5ff");
+
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#cbd5e1";
+          ctx.font = "14px system-ui";
+          ctx.fillText(state.note, 550, 610);
+          ctx.textAlign = "left";
+        }
+
+        function drawDragonSelect() {
+          buttons.length = 0;
+          drawArena();
+          ctx.fillStyle = "#020617aa";
+          ctx.fillRect(0, 0, 1100, 620);
+
+          const select = cfg.dragonSelect;
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 42px system-ui";
+          ctx.fillText("Choose Your Dragon", 550, select.titleY);
+          ctx.fillStyle = "#cbd5e1";
+          ctx.font = "18px system-ui";
+          ctx.fillText("Each role changes Attack, Defence, or Skill timing in battle.", 550, select.subtitleY);
+
+          cfg.dragons.forEach((dragon, index) => {
+            const x = select.firstCardX + index * (select.cardW + select.cardGap);
+            const selected = state.selectedDragonId === dragon.id;
+            buttons.push({ id: `select:${dragon.id}`, x, y: select.cardY, w: select.cardW, h: select.cardH });
+            rr(x, select.cardY, select.cardW, select.cardH, 20, selected ? "#1f2937f2" : "#0f172adf", selected ? "#f6c453" : "#ffffff33");
+            drawDragonImage(dragon.id, x + select.cardW / 2, select.imageY, select.imageW, select.imageH, cfg.facing.player.flip);
+            ctx.fillStyle = "#fff4d6";
+            ctx.font = "bold 25px system-ui";
+            ctx.fillText(dragon.name, x + select.cardW / 2, select.cardY + 165);
+            ctx.fillStyle = selected ? "#f6c453" : "#93c5fd";
+            ctx.font = "bold 17px system-ui";
+            ctx.fillText(dragon.role, x + select.cardW / 2, select.cardY + 193);
+            ctx.fillStyle = "#cbd5e1";
+            ctx.font = "14px system-ui";
+            wrapText(dragon.flavor, x + select.cardW / 2, select.cardY + 224, select.cardW - 46, 18);
+            ctx.fillStyle = "#bbf7d0";
+            ctx.font = "bold 13px system-ui";
+            ctx.fillText(`ATK x${dragon.modifiers.attackDamage}  DEF x${dragon.modifiers.defenceDuration}  SKILL x${dragon.modifiers.skillCooldown}`, x + select.cardW / 2, select.cardY + 300);
+          });
+
+          const selectedDragon = core.getSelectedDragon(cfg, state);
+          state.note = selectedDragon ? `${selectedDragon.name}: ${selectedDragon.role}` : state.note;
+          drawControls();
+          ctx.textAlign = "left";
+        }
+
+        function wrapText(text, x, y, maxWidth, lineHeight) {
+          const words = text.split(" ");
+          let line = "";
+          words.forEach((word) => {
+            const next = line ? `${line} ${word}` : word;
+            if (ctx.measureText(next).width > maxWidth && line) {
+              ctx.fillText(line, x, y);
+              line = word;
+              y += lineHeight;
+            } else {
+              line = next;
+            }
+          });
+          if (line) ctx.fillText(line, x, y);
+        }
+
+        function fallbackDragon(x, y, flip, body, wing, horn) {
+          ctx.save();
+          ctx.translate(x, y);
+          if (flip) ctx.scale(-1, 1);
+          ctx.fillStyle = "#0005";
+          ctx.beginPath();
+          ctx.ellipse(0, 72, 92, 23, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = wing;
+          ctx.strokeStyle = "#0008";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(-25, 5);
+          ctx.lineTo(-115, -70);
+          ctx.lineTo(-85, 35);
+          ctx.closePath();
+          ctx.moveTo(28, 5);
+          ctx.lineTo(100, -55);
+          ctx.lineTo(80, 35);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = body;
+          ctx.beginPath();
+          ctx.ellipse(0, 18, 55, 72, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.ellipse(50, -40, 48, 37, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = horn;
+          ctx.beginPath();
+          ctx.moveTo(34, -72);
+          ctx.lineTo(14, -112);
+          ctx.lineTo(55, -80);
+          ctx.closePath();
+          ctx.moveTo(68, -70);
+          ctx.lineTo(98, -100);
+          ctx.lineTo(82, -56);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#111827";
+          ctx.beginPath();
+          ctx.arc(66, -48, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        function drawDragonImage(key, x, y, w, h, flip) {
+          const image = images[key];
+
+          if (!image || !image.complete || image.naturalWidth === 0) {
+            fallbackDragon(x, y, flip, key !== "enemy" ? "#d6a44c" : "#a855f7", key !== "enemy" ? "#8b5a2b" : "#6d28d9", key !== "enemy" ? "#f3d179" : "#fca5a5");
+            return;
+          }
+
+          ctx.save();
+          ctx.translate(x, y);
+          if (flip) ctx.scale(-1, 1);
+          ctx.fillStyle = "#0005";
+          ctx.beginPath();
+          ctx.ellipse(0, h * 0.42, w * 0.42, 23, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.drawImage(image, -w / 2, -h / 2, w, h);
+          ctx.restore();
+        }
+
+        function drawElementIcon(x, y, key) {
+          const element = cfg.elements[key] || cfg.elements.enemy;
+          ctx.fillStyle = element.color;
+          ctx.beginPath();
+          ctx.arc(x, y, 15, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#fff8";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#07101d";
+          ctx.font = "bold 13px system-ui";
+          ctx.fillText(element.icon, x, y + 5);
+          ctx.textAlign = "left";
+        }
+
+        function miniCooldown(x, y, label, value, max, color, w = 92) {
+          const ready = value <= 0;
+          rr(x, y, w, 20, 8, ready ? "#123326dd" : "#3b2230dd", color);
+          ctx.textAlign = "center";
+          ctx.fillStyle = ready ? "#bbf7d0" : "#fecaca";
+          ctx.font = "bold 10px system-ui";
+          ctx.fillText(ready ? `${label} READY` : `${label} ${value.toFixed(1)}s`, x + w / 2, y + 14);
+          if (!ready) {
+            ctx.fillStyle = "#0005";
+            ctx.fillRect(x + 4, y + 4, (w - 8) * clamp(value / max, 0, 1), 12);
+          }
+          ctx.textAlign = "left";
+        }
+
+        function drawPanelCooldowns(layout, side) {
+          const y = layout.y + 101;
+          if (side === "player") {
+            miniCooldown(layout.x + 17, y, "ATK", state.cd.attack, cfg.attackCd, "#fb923c", 82);
+            miniCooldown(layout.x + 105, y, "DEF", state.cd.defence, cfg.defenceCd, "#60a5fa", 82);
+            miniCooldown(layout.x + 193, y, "BLK", state.cd.block, cfg.blockCd, "#f6c453", 82);
+            miniCooldown(layout.x + 281, y, "ULT", state.cd.ultimate, cfg.ultimateCd, "#a78bfa", 82);
+            return;
+          }
+
+          miniCooldown(layout.x + 22, y, "ATK", state.enemyTimer, cfg.enemyMaxWait, "#fb923c");
+          miniCooldown(layout.x + 121, y, "DEF", 0, cfg.defenceCd, "#60a5fa");
+          miniCooldown(layout.x + 220, y, "ULT", 0, cfg.ultimateCd, "#a78bfa");
+        }
+
+        function drawStatusPanel(layout, title, subtitle, hp, color, elementKey) {
+          rr(layout.x, layout.y, layout.w, layout.h, 18, "#07101dcc", "#ffffff22");
+          drawElementIcon(layout.x + 26, layout.y + 34, elementKey);
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 24px system-ui";
+          ctx.fillText(title, layout.x + 48, layout.y + 36);
+          ctx.fillStyle = "#cbd5e1";
+          ctx.font = "14px system-ui";
+          ctx.fillText(subtitle, layout.x + 23, layout.y + 96);
+          hpBar(layout.x + 23, layout.y + 50, layout.w - 60, 32, hp, color, "HP");
+        }
+
+        function drawStateLabel(text, x, y) {
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#07101dd9";
+          ctx.strokeStyle = "#f6c45377";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.roundRect(x - 74, y - 24, 148, 34, 14);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 18px system-ui";
+          ctx.fillText(text, x, y);
+          ctx.textAlign = "left";
+        }
+
+        function drawCommandPanel(layout, title, value, align = "center") {
+          rr(layout.x, layout.y, layout.w, layout.h, 18, "#07101dcc", "#f6c45366");
+          ctx.textAlign = align;
+          const textX = align === "left" ? layout.x + 20 : align === "right" ? layout.x + layout.w - 20 : layout.x + layout.w / 2;
+          ctx.fillStyle = "#93c5fd";
+          ctx.font = "bold 12px system-ui";
+          ctx.fillText(title, textX, layout.y + 20);
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 18px system-ui";
+          ctx.fillText(value, textX, layout.y + 44);
+          ctx.textAlign = "left";
+        }
+
+        function drawGuardEffect(layout) {
+          const blockActive = state.blockTimer > 0;
+          const defenceActive = state.defenceTimer > 0;
+          if (!blockActive && !defenceActive) return;
+
+          const now = performance.now() / 1000;
+          const color = blockActive ? "#f6c453" : "#60a5fa";
+          const radius = Math.max(layout.w, layout.h) * (blockActive ? 0.56 : 0.5);
+          const pulse = 1 + Math.sin(now * (blockActive ? 12 : 7)) * 0.025;
+
+          ctx.save();
+          ctx.translate(layout.x, layout.y);
+          ctx.scale(pulse, pulse);
+          ctx.shadowColor = color;
+          ctx.shadowBlur = blockActive ? 28 : 18;
+          ctx.fillStyle = blockActive ? "#f6c45316" : "#60a5fa12";
+          ctx.strokeStyle = color;
+          ctx.lineWidth = blockActive ? 9 : 6;
+          ctx.beginPath();
+          if (blockActive) {
+            for (let i = 0; i < 6; i += 1) {
+              const angle = -Math.PI / 2 + i * Math.PI / 3;
+              const px = Math.cos(angle) * radius;
+              const py = Math.sin(angle) * radius * 0.7;
+              if (i === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+          } else {
+            ctx.ellipse(0, 0, radius, radius * 0.7, 0, 0, Math.PI * 2);
+          }
+          ctx.fill();
+          ctx.stroke();
+
+          if (!blockActive) {
+            ctx.globalAlpha = 0.65;
+            ctx.lineWidth = 3;
+            ctx.setLineDash([20, 14]);
+            ctx.lineDashOffset = -now * 36;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, radius * 0.86, radius * 0.59, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          const remaining = blockActive ? state.blockTimer : state.defenceTimer;
+          ctx.save();
+          ctx.textAlign = "center";
+          ctx.font = "bold 15px system-ui";
+          ctx.fillStyle = color;
+          ctx.fillText(`${blockActive ? "BLOCK" : "DEFENCE"} ${remaining.toFixed(1)}s`, layout.x, layout.y + layout.h * 0.58);
+          ctx.restore();
+        }
+
+        function drawPendingAttack(attack) {
+          const casting = attack.elapsed < attack.castTime;
+          const sourcePulse = clamp(attack.elapsed / attack.castTime, 0, 1);
+
+          if (casting) {
+            ctx.save();
+            ctx.globalAlpha = 0.45 + sourcePulse * 0.35;
+            ctx.strokeStyle = attack.color;
+            ctx.lineWidth = attack.command === "ultimate" ? 8 : 5;
+            ctx.beginPath();
+            ctx.arc(attack.startX, attack.startY, attack.size * (1.4 + sourcePulse), 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = attack.color;
+            ctx.beginPath();
+            ctx.arc(attack.startX, attack.startY, attack.size * 0.45, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+            return;
+          }
+
+          const t = clamp((attack.elapsed - attack.castTime) / attack.travelTime, 0, 1);
+          const x = attack.startX + (attack.endX - attack.startX) * t;
+          const y = attack.startY + (attack.endY - attack.startY) * t;
+          const radius = attack.size * (1 - t * 0.2);
+          const angle = Math.atan2(attack.endY - attack.startY, attack.endX - attack.startX);
+          const trailT = clamp(t - 0.18, 0, 1);
+          const trailX = attack.startX + (attack.endX - attack.startX) * trailT;
+          const trailY = attack.startY + (attack.endY - attack.startY) * trailT;
+
+          ctx.save();
+          ctx.globalAlpha = 0.5;
+          ctx.strokeStyle = attack.color;
+          ctx.lineWidth = radius * (attack.command === "ultimate" ? 1.15 : 0.72);
+          ctx.lineCap = "round";
+          ctx.shadowColor = attack.color;
+          ctx.shadowBlur = 18;
+          ctx.beginPath();
+          ctx.moveTo(trailX, trailY);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(angle);
+          ctx.shadowColor = attack.color;
+          ctx.shadowBlur = attack.command === "ultimate" ? 24 : 14;
+          const projectile = images[attack.assetKey];
+          if (projectile && projectile.complete && projectile.naturalWidth > 0) {
+            ctx.drawImage(projectile, -radius * 2.5, -radius * 1.25, radius * 5, radius * 2.5);
+          } else {
+            ctx.fillStyle = attack.color;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, radius * 1.45, radius * 0.72, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#fff7";
+            ctx.beginPath();
+            ctx.ellipse(radius * 0.25, -radius * 0.18, radius * 0.55, radius * 0.22, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        function drawArena() {
+          const bg = images.background;
+
+          if (bg && bg.complete && bg.naturalWidth > 0) {
+            ctx.drawImage(bg, 0, 0, 1100, 620);
+            ctx.fillStyle = "#02061755";
+            ctx.fillRect(0, 0, 1100, 620);
+            return;
+          }
+
+          const g = ctx.createLinearGradient(0, 0, 0, 620);
+          g.addColorStop(0, "#263a5b");
+          g.addColorStop(0.6, "#17233a");
+          g.addColorStop(1, "#0b1020");
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, 1100, 620);
+          ctx.fillStyle = "#f6c45318";
+          ctx.beginPath();
+          ctx.ellipse(550, 350, 445, 115, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#f6c45355";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.ellipse(550, 350, 455, 122, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        function draw() {
+          if (state.phase === "select") {
+            drawDragonSelect();
+            return;
+          }
+
+          ctx.save();
+          if (state.shake > 0) ctx.translate(rand(-6, 6), rand(-5, 5));
+
+          drawArena();
+          const renderData = core.getBattleRenderData(cfg, state);
+          const layout = cfg.battleLayout;
+          drawDragonImage(renderData.enemy.assetKey, layout.enemyDragon.x, layout.enemyDragon.y, layout.enemyDragon.w, layout.enemyDragon.h, renderData.enemy.flip);
+          drawDragonImage(renderData.player.assetKey, layout.playerDragon.x, layout.playerDragon.y, layout.playerDragon.w, layout.playerDragon.h, renderData.player.flip);
+          drawGuardEffect(layout.playerDragon);
+          state.pendingAttacks.forEach(drawPendingAttack);
+
+          state.particles.forEach((p) => {
+            ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+          });
+
+          drawStatusPanel(layout.playerHud, `P1 ${renderData.player.name}`, renderData.player.role, state.playerHp, "#34d399", state.selectedDragonId);
+          drawStatusPanel(layout.enemyHud, "P2 Enemy Dragon", "AI Rival", state.enemyHp, "#ef4444", "enemy");
+          drawPanelCooldowns(layout.playerHud, "player");
+          drawPanelCooldowns(layout.enemyHud, "enemy");
+
+          rr(layout.timer.x, layout.timer.y, layout.timer.w, layout.timer.h, 18, "#07101de0", "#f6c45388");
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#f6c453";
+          ctx.font = "bold 17px system-ui";
+          ctx.fillText("TIME", layout.timer.x + layout.timer.w / 2, layout.timer.y + 27);
+          ctx.font = "bold 32px system-ui";
+          ctx.fillText(String(Math.ceil(state.time)), layout.timer.x + layout.timer.w / 2, layout.timer.y + 62);
+          ctx.textAlign = "left";
+
+          drawStateLabel(state.enemyState, layout.enemyDragon.x, layout.enemyDragon.labelY);
+          drawStateLabel(state.playerState, layout.playerDragon.x, layout.playerDragon.labelY);
+
+          ctx.fillStyle = listening ? "#34d399" : micRequested ? "#f6c453" : "#fca5a5";
+          ctx.font = "bold 16px system-ui";
+          ctx.fillText(listening ? "Mic listening" : micRequested ? "Mic reconnecting" : "Mic off", layout.mic.x, layout.mic.y);
+
+          rr(layout.message.x, layout.message.y, layout.message.w, layout.message.h, 18, "#07101dd9", "#f6c45366");
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 21px system-ui";
+          ctx.fillText(state.message, layout.message.textX, layout.message.textY);
+          ctx.textAlign = "left";
+
+          drawCommandPanel(layout.playerCommand, "P1 COMMAND", state.accepted, "left");
+          drawCommandPanel(layout.commandReference, "COMMANDS", "Attack | Defence | Block | Ultimate/Skill");
+          drawCommandPanel(layout.enemyCommand, "P2 / AI COMMAND", state.enemyAccepted, "right");
+
+          if (state.phase === "ended") {
+            ctx.fillStyle = "#020617b8";
+            ctx.fillRect(0, 0, 1100, 620);
+            rr(275, 175, 550, 250, 26, "#0f172af2", "#f6c453dd");
+            ctx.textAlign = "center";
+            ctx.font = "bold 44px system-ui";
+            ctx.fillStyle = state.phase === "ended" ? state.result.includes("WIN") ? "#34d399" : state.result.includes("LOSE") ? "#ef4444" : "#f6c453" : "#fff4d6";
+            ctx.fillText(state.result, 550, 250);
+            ctx.fillStyle = "#cbd5e1";
+            ctx.font = "20px system-ui";
+            ctx.fillText("Say: Attack, Defence, Block, Ultimate, or Skill", 550, 305);
+            ctx.fillText("Or use canvas buttons / keys A, D, B, U", 550, 340);
+            ctx.fillStyle = "#f6c453";
+            ctx.font = "bold 21px system-ui";
+            ctx.fillText("Choose Dragon Again", 550, 385);
+            ctx.textAlign = "left";
+          }
+
+          drawControls();
+
+          ctx.restore();
+        }
+
+        function loop(now) {
+          const dt = Math.min(0.033, (now - last) / 1000);
+          last = now;
+          update(dt);
+          draw();
+          requestAnimationFrame(loop);
+        }
+
+        function setupSpeech() {
+          if (!SpeechRecognition) {
+            state.note = "This browser does not support Web Speech API. Use canvas buttons or A/D/B/U/R.";
+            return;
+          }
+
+          recognition = new SpeechRecognition();
+          recognition.lang = "en-US";
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.maxAlternatives = 3;
+
+          recognition.onstart = () => {
+            listening = true;
+            speechError = "";
+            state.note = "Listening. Say Attack / Defence / Block / Ultimate or Skill.";
+            log("mic_start");
+          };
+
+          recognition.onend = () => {
+            listening = false;
+            if (micRequested) {
+              state.note = speechError || "Reconnecting microphone...";
+              clearTimeout(recognitionRestartTimer);
+              recognitionRestartTimer = setTimeout(startRecognition, 250);
+            } else if (!speechError) {
+              state.note = "Mic is off. Press Start Mic to listen again.";
+            }
+            log("mic_end");
+          };
+
+          recognition.onerror = (e) => {
+            const fatal = ["not-allowed", "service-not-allowed", "audio-capture"].includes(e.error);
+            if (fatal) micRequested = false;
+            speechError = e.error === "no-speech"
+              ? "No speech heard. Microphone will keep listening."
+              : e.error === "aborted" && !micRequested
+                ? "Mic is off. Press Start Mic to listen again."
+                : `Mic error: ${e.error}. Use canvas buttons or A/D/B/U.`;
+            state.note = speechError;
+            log("mic_error", { error: e.error });
+          };
+
+          recognition.onresult = (e) => {
+            if (!micRequested) return;
+
+            for (let i = e.resultIndex; i < e.results.length; i += 1) {
+              const alternatives = Array.from(e.results[i]).map((alternative) => ({
+                text: alternative.transcript,
+                normalized: normalize(alternative.transcript),
+                confidence: alternative.confidence,
+                cmd: commandFromSpeech(alternative.transcript)
+              }));
+              const best = alternatives.find((alternative) => alternative.cmd) || alternatives[0];
+              state.lastHeard = best?.normalized || "-";
+
+              if (e.results[i].isFinal) {
+                const now = performance.now();
+                const signature = `${best?.cmd || "unknown"}:${best?.normalized || ""}`;
+                const duplicate = signature === lastVoiceCommand.signature && now - lastVoiceCommand.at < 650;
+                log("speech_final", { alternatives, cmd: best?.cmd || null, duplicate });
+
+                if (duplicate) continue;
+                lastVoiceCommand = { signature, at: now };
+                if (best?.cmd) useCommand(best.cmd, "voice");
+                else state.message = "Not recognized. Say Attack, Defence, Block, Ultimate, or Skill.";
+              }
+            }
+          };
+
+          state.note = "Voice is supported. Press Start Mic to play.";
+        }
+
+        canvas.addEventListener("pointerup", (e) => {
+          const rect = canvas.getBoundingClientRect();
+          const scaleX = canvas.width / rect.width;
+          const scaleY = canvas.height / rect.height;
+          const x = (e.clientX - rect.left) * scaleX;
+          const y = (e.clientY - rect.top) * scaleY;
+          const button = buttons.find((item) => x >= item.x && x <= item.x + item.w && y >= item.y && y <= item.y + item.h);
+
+          if (!button) return;
+          if (button.id.startsWith("select:")) {
+            state.selectedDragonId = button.id.slice("select:".length);
+            const dragon = core.getSelectedDragon(cfg, state);
+            state.message = `${dragon.name} selected.`;
+            state.note = `${dragon.role}: Attack x${dragon.modifiers.attackDamage}, Defence x${dragon.modifiers.defenceDuration}, Skill x${dragon.modifiers.skillCooldown}`;
+          }
+          if (button.id === "confirmDragon") confirmDragon();
+          if (button.id === "mic") toggleMic();
+          if (button.id === "attack") useCommand("attack", "canvas");
+          if (button.id === "defence") useCommand("defence", "canvas");
+          if (button.id === "block") useCommand("block", "canvas");
+          if (button.id === "ultimate") useCommand("ultimate", "canvas");
+          if (button.id === "restart") reset();
+          if (button.id === "chooseDragonAgain") chooseDragonAgain();
+        });
+
+        window.addEventListener("keydown", (e) => {
+          const k = e.key.toLowerCase();
+          if (state.phase === "select" && k === "enter") confirmDragon();
+          if (k === "a") useCommand("attack", "keyboard");
+          if (k === "d") useCommand("defence", "keyboard");
+          if (k === "b") useCommand("block", "keyboard");
+          if (k === "u") useCommand("ultimate", "keyboard");
+          if (k === "r") reset();
+        });
+
+        setupSpeech();
+        requestAnimationFrame(loop);
+      })();
+    </script>
+  </body>
+</html>
