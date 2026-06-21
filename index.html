@@ -19,7 +19,7 @@
       }
 
       canvas {
-        aspect-ratio: 16 / 9;
+        aspect-ratio: 70 / 31;
         background: #17223a;
         border: 3px solid #f6c453;
         border-radius: 20px;
@@ -28,12 +28,12 @@
         display: block;
         max-height: 100vh;
         touch-action: none;
-        width: min(1100px, 100vw);
+        width: min(1400px, 100vw);
       }
     </style>
   </head>
   <body>
-    <canvas id="game" width="1100" height="620"></canvas>
+    <canvas id="game" width="1400" height="620"></canvas>
 
     <script>
       (() => {
@@ -42,6 +42,7 @@
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const svgDataUri = (svg) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
         const cfg = {
+          viewport: { width: 1400, height: 620, centerX: 700 },
           matchTime: 60,
           maxHp: 100,
           baseAttackDamage: 12,
@@ -56,8 +57,13 @@
           blockActiveTime: 1.0,
           castWarningTime: 0.35,
           projectileTravelTime: 0.65,
+          enemyProjectileTravelTime: 1.15,
           enemyMinWait: 1.3,
           enemyMaxWait: 2.4,
+          voice: {
+            scanIntervalMs: 1000,
+            duplicateWindowMs: 650
+          },
           progression: {
             enemyHpPerStage: 18,
             enemyDamagePerStage: 2,
@@ -162,29 +168,43 @@
             cardW: 310,
             cardH: 330,
             cardGap: 30,
-            firstCardX: 70,
+            firstCardX: 205,
             imageY: 252,
             imageW: 195,
             imageH: 140,
-            confirm: { x: 415, y: 510, w: 270, h: 48 }
+            confirm: { x: 565, y: 510, w: 270, h: 48 }
           },
           upgradeLayout: {
             textAlign: "center",
-            cardTextInset: 17
+            cardTextInset: 17,
+            firstCardX: 135,
+            cardW: 260,
+            cardGap: 30
           },
           battleLayout: {
-            playerDragon: { x: 360, y: 390, w: 358, h: 253, labelY: 226, hitX: 385, hitY: 370 },
-            enemyDragon: { x: 766, y: 312, w: 170, h: 124, labelY: 204, hitX: 750, hitY: 300 },
-            playerHud: { x: 22, y: 12, w: 390, h: 128 },
-            enemyHud: { x: 688, y: 12, w: 390, h: 128 },
-            timer: { x: 465, y: 18, w: 170, h: 78 },
-            message: { x: 342, y: 144, w: 416, h: 40, textX: 550, textY: 169 },
+            playerDragon: { x: 470, y: 390, w: 358, h: 253, labelY: 226, hitX: 495, hitY: 370 },
+            enemyDragon: { x: 1030, y: 312, w: 170, h: 124, labelY: 204, hitX: 1014, hitY: 300 },
+            playerHud: { x: 22, y: 12, w: 470, h: 128 },
+            enemyHud: { x: 908, y: 12, w: 470, h: 128 },
+            timer: { x: 615, y: 18, w: 170, h: 78 },
+            message: { x: 492, y: 144, w: 416, h: 40, textX: 700, textY: 169 },
             mic: { x: 45, y: 168 },
-            playerCommand: { x: 28, y: 474, w: 308, h: 58 },
-            commandReference: { x: 358, y: 474, w: 384, h: 58 },
-            enemyCommand: { x: 764, y: 474, w: 308, h: 58 }
+            playerCommand: { x: 28, y: 474, w: 390, h: 58 },
+            commandReference: { x: 505, y: 474, w: 390, h: 58 },
+            enemyCommand: { x: 982, y: 474, w: 390, h: 58 },
+            controls: {
+              mic: { x: 122, y: 548, w: 132, h: 44 },
+              attack: { x: 304, y: 548, w: 108, h: 44 },
+              defence: { x: 454, y: 548, w: 108, h: 44 },
+              block: { x: 604, y: 548, w: 108, h: 44 },
+              ultimate: { x: 754, y: 548, w: 108, h: 44 },
+              restart: { x: 1130, y: 548, w: 148, h: 44 },
+              chooseDragonAgain: { x: 601, y: 548, w: 198, h: 44 }
+            }
           }
         };
+        canvas.width = cfg.viewport.width;
+        canvas.height = cfg.viewport.height;
 
         function getDragonById(config, dragonId) {
           return config.dragons.find((dragon) => dragon.id === dragonId) || null;
@@ -334,6 +354,8 @@
         let listening = false;
         let micRequested = false;
         let recognitionRestartTimer = null;
+        let voiceScanTimer = null;
+        const voiceCommandQueue = [];
         let speechError = "";
         let lastVoiceCommand = { signature: "", at: 0 };
         let last = performance.now();
@@ -449,6 +471,7 @@
         cfg.dragons.forEach((dragon) => loadImage(dragon.id, dragon.asset));
 
         function reset() {
+          clearVoiceCommandQueue();
           const playerMaxHp = core.getPlayerMaxHp(cfg, state);
           const enemy = core.getEnemyStats(cfg, state);
           state.phase = "playing";
@@ -461,7 +484,7 @@
           state.playerState = "Ready";
           state.enemyState = "Ready";
           state.message = `Stage ${state.stage}: ${enemy.name} approaches.`;
-          state.note = "Use canvas buttons, keyboard, or voice commands.";
+          state.note = "Voice commands are scanned every 1 second and executed in spoken order.";
           state.result = "";
           state.battleOutcome = null;
           state.cd.attack = 0;
@@ -478,6 +501,7 @@
         }
 
         function chooseDragonAgain() {
+          clearVoiceCommandQueue();
           state.phase = "select";
           state.selectedDragonId = null;
           state.stage = 1;
@@ -516,15 +540,53 @@
             .trim();
         }
 
-        function commandFromSpeech(text) {
-          const words = normalize(text).split(" ").filter(Boolean);
-          for (const word of words) {
-            if (word === "attack") return "attack";
-            if (word === "block") return "block";
-            if (word === "defence" || word === "defense") return "defence";
-            if (word === "ultimate" || word === "skill") return "ultimate";
-          }
+        function commandFromWord(word) {
+          if (word === "attack") return "attack";
+          if (word === "block") return "block";
+          if (word === "defence" || word === "defense") return "defence";
+          if (word === "ultimate" || word === "skill") return "ultimate";
           return null;
+        }
+
+        function commandsFromSpeech(text) {
+          return normalize(text)
+            .split(" ")
+            .map(commandFromWord)
+            .filter(Boolean);
+        }
+
+        function commandFromSpeech(text) {
+          return commandsFromSpeech(text)[0] || null;
+        }
+
+        function clearVoiceCommandQueue() {
+          voiceCommandQueue.length = 0;
+        }
+
+        function flushVoiceCommandQueue() {
+          const commands = voiceCommandQueue.splice(0);
+          if (!micRequested || state.phase !== "playing") {
+            if (commands.length) log("voice_window_discarded", { commands, phase: state.phase });
+            return [];
+          }
+
+          commands.forEach((command) => useCommand(command, "voice"));
+          if (commands.length) {
+            state.note = `Voice window: ${commands.map((command) => command.toUpperCase()).join(" → ")}`;
+            log("voice_window_executed", { commands });
+          }
+          return commands;
+        }
+
+        function startVoiceScanner() {
+          if (voiceScanTimer !== null) return;
+          voiceScanTimer = setInterval(flushVoiceCommandQueue, cfg.voice.scanIntervalMs);
+        }
+
+        function stopVoiceScanner() {
+          if (voiceScanTimer !== null) clearInterval(voiceScanTimer);
+          voiceScanTimer = null;
+          clearVoiceCommandQueue();
         }
 
         function confirmDragon() {
@@ -559,7 +621,7 @@
             assetKey: command === "ultimate" ? "projectileUltimate" : "projectileAttack",
             elapsed: 0,
             castTime: cfg.castWarningTime,
-            travelTime: cfg.projectileTravelTime,
+            travelTime: source === "enemy" ? cfg.enemyProjectileTravelTime : cfg.projectileTravelTime,
             startX: sourceLayout.hitX,
             startY: sourceLayout.hitY - 28,
             endX: targetLayout.hitX,
@@ -668,6 +730,7 @@
           if (micRequested) {
             micRequested = false;
             clearTimeout(recognitionRestartTimer);
+            stopVoiceScanner();
             if (listening) recognition.stop();
             else state.note = "Mic is off. Press Start Mic to listen again.";
             return;
@@ -675,6 +738,7 @@
 
           micRequested = true;
           speechError = "";
+          startVoiceScanner();
           startRecognition();
         }
 
@@ -704,6 +768,7 @@
 
         function finish(result) {
           if (state.phase !== "playing") return;
+          clearVoiceCommandQueue();
           const won = result.includes("WIN");
           state.phase = "upgrade";
           state.result = result;
@@ -851,39 +916,42 @@
         }
 
         function drawControls() {
+          const centerX = cfg.viewport.centerX;
           if (state.phase === "select") {
             const select = cfg.dragonSelect;
             canvasButton("confirmDragon", select.confirm.x, select.confirm.y, select.confirm.w, select.confirm.h, "Confirm Dragon", state.selectedDragonId ? "#f6c453dd" : "#475569cc", state.selectedDragonId ? "#f6c453" : "#64748b");
             ctx.textAlign = "center";
             ctx.fillStyle = "#cbd5e1";
             ctx.font = "14px system-ui";
-            ctx.fillText(state.note, 550, 610);
+            ctx.fillText(state.note, centerX, cfg.viewport.height - 10);
             ctx.textAlign = "left";
             return;
           }
 
           buttons.length = 0;
           if (state.phase === "ended") {
-            canvasButton("chooseDragonAgain", 451, 548, 198, 44, "Choose Dragon Again", "#102a4cdd", "#87d5ff");
+            const choose = cfg.battleLayout.controls.chooseDragonAgain;
+            canvasButton("chooseDragonAgain", choose.x, choose.y, choose.w, choose.h, "Choose Dragon Again", "#102a4cdd", "#87d5ff");
             ctx.textAlign = "center";
             ctx.fillStyle = "#cbd5e1";
             ctx.font = "14px system-ui";
-            ctx.fillText(state.note, 550, 610);
+            ctx.fillText(state.note, centerX, cfg.viewport.height - 10);
             ctx.textAlign = "left";
             return;
           }
 
-          canvasButton("mic", 82, 548, 132, 44, micRequested ? "Stop Mic" : "Start Mic", listening ? "#164e35dd" : micRequested ? "#713f12dd" : "#f6c453dd", "#f6c453");
-          canvasButton("attack", 238, 548, 108, 44, "Attack", "#402313dd", "#fb923c");
-          canvasButton("defence", 368, 548, 108, 44, "Defence", "#16324add", "#60a5fa");
-          canvasButton("block", 498, 548, 108, 44, "Block", "#3b2b12dd", "#f6c453");
-          canvasButton("ultimate", 628, 548, 108, 44, "Ultimate", "#30215bdd", "#a78bfa");
-          canvasButton("restart", 864, 548, 148, 44, "Restart", "#102a4cdd", "#87d5ff");
+          const controls = cfg.battleLayout.controls;
+          canvasButton("mic", controls.mic.x, controls.mic.y, controls.mic.w, controls.mic.h, micRequested ? "Stop Mic" : "Start Mic", listening ? "#164e35dd" : micRequested ? "#713f12dd" : "#f6c453dd", "#f6c453");
+          canvasButton("attack", controls.attack.x, controls.attack.y, controls.attack.w, controls.attack.h, "Attack", "#402313dd", "#fb923c");
+          canvasButton("defence", controls.defence.x, controls.defence.y, controls.defence.w, controls.defence.h, "Defence", "#16324add", "#60a5fa");
+          canvasButton("block", controls.block.x, controls.block.y, controls.block.w, controls.block.h, "Block", "#3b2b12dd", "#f6c453");
+          canvasButton("ultimate", controls.ultimate.x, controls.ultimate.y, controls.ultimate.w, controls.ultimate.h, "Ultimate", "#30215bdd", "#a78bfa");
+          canvasButton("restart", controls.restart.x, controls.restart.y, controls.restart.w, controls.restart.h, "Restart", "#102a4cdd", "#87d5ff");
 
           ctx.textAlign = "center";
           ctx.fillStyle = "#cbd5e1";
           ctx.font = "14px system-ui";
-          ctx.fillText(state.note, 550, 610);
+          ctx.fillText(state.note, centerX, cfg.viewport.height - 10);
           ctx.textAlign = "left";
         }
 
@@ -891,16 +959,16 @@
           buttons.length = 0;
           drawArena();
           ctx.fillStyle = "#020617aa";
-          ctx.fillRect(0, 0, 1100, 620);
+          ctx.fillRect(0, 0, cfg.viewport.width, cfg.viewport.height);
 
           const select = cfg.dragonSelect;
           ctx.textAlign = "center";
           ctx.fillStyle = "#fff4d6";
           ctx.font = "bold 42px system-ui";
-          ctx.fillText("Choose Your Dragon", 550, select.titleY);
+          ctx.fillText("Choose Your Dragon", cfg.viewport.centerX, select.titleY);
           ctx.fillStyle = "#cbd5e1";
           ctx.font = "18px system-ui";
-          ctx.fillText("Each role changes Attack, Defence, or Skill timing in battle.", 550, select.subtitleY);
+          ctx.fillText("Each role changes Attack, Defence, or Skill timing in battle.", cfg.viewport.centerX, select.subtitleY);
 
           cfg.dragons.forEach((dragon, index) => {
             const x = select.firstCardX + index * (select.cardW + select.cardGap);
@@ -932,7 +1000,7 @@
           buttons.length = 0;
           drawArena();
           ctx.fillStyle = "#020617d9";
-          ctx.fillRect(0, 0, 1100, 620);
+          ctx.fillRect(0, 0, cfg.viewport.width, cfg.viewport.height);
 
           const outcome = state.battleOutcome;
           const won = Boolean(outcome?.won);
@@ -940,22 +1008,22 @@
           ctx.textAlign = upgradeLayout.textAlign;
           ctx.fillStyle = won ? "#34d399" : state.result === "DRAW" ? "#f6c453" : "#fca5a5";
           ctx.font = "bold 38px system-ui";
-          ctx.fillText(state.result || "BATTLE COMPLETE", 550, 58);
+          ctx.fillText(state.result || "BATTLE COMPLETE", cfg.viewport.centerX, 58);
           ctx.fillStyle = "#fff4d6";
           ctx.font = "bold 23px system-ui";
-          ctx.fillText(won ? `Stage ${state.stage} cleared — prepare for Stage ${state.stage + 1}` : `Stage ${state.stage} will be retried`, 550, 94);
+          ctx.fillText(won ? `Stage ${state.stage} cleared — prepare for Stage ${state.stage + 1}` : `Stage ${state.stage} will be retried`, cfg.viewport.centerX, 94);
           ctx.fillStyle = "#cbd5e1";
           ctx.font = "16px system-ui";
-          ctx.fillText("Choose one upgrade. The next battle begins immediately.", 550, 124);
+          ctx.fillText("Choose one upgrade. The next battle begins immediately.", cfg.viewport.centerX, 124);
 
           const upgradeIds = Object.keys(cfg.progression.upgrades);
           upgradeIds.forEach((upgradeId, index) => {
             const upgrade = core.getUpgrade(cfg, upgradeId);
             const rank = state.upgrades[upgradeId];
             const available = core.canApplyUpgrade(cfg, state, upgradeId);
-            const x = 35 + index * 265;
+            const x = upgradeLayout.firstCardX + index * (upgradeLayout.cardW + upgradeLayout.cardGap);
             const y = 158;
-            const w = 235;
+            const w = upgradeLayout.cardW;
             const h = 330;
             ctx.textAlign = upgradeLayout.textAlign;
             rr(x, y, w, h, 22, available ? "#0f172af2" : "#111827dd", available ? upgrade.color : "#64748b");
@@ -984,11 +1052,11 @@
 
           canvasButton("chooseDragonAgain", 55, 535, 190, 44, "Change Dragon", "#102a4cdd", "#87d5ff");
           if (core.allUpgradesMaxed(cfg, state)) {
-            canvasButton("continueMax", 420, 525, 260, 54, "Continue — All Maxed", "#164e35dd", "#34d399");
+            canvasButton("continueMax", cfg.viewport.centerX - 130, 525, 260, 54, "Continue — All Maxed", "#164e35dd", "#34d399");
           }
           ctx.fillStyle = "#94a3b8";
           ctx.font = "14px system-ui";
-          ctx.fillText("Keys 1–4 choose an upgrade", 550, 607);
+          ctx.fillText("Keys 1–4 choose an upgrade", cfg.viewport.centerX, cfg.viewport.height - 13);
           ctx.textAlign = "left";
         }
 
@@ -1316,28 +1384,34 @@
 
         function drawArena() {
           const bg = images.background;
+          const { width, height, centerX } = cfg.viewport;
 
-          if (bg && bg.complete && bg.naturalWidth > 0) {
-            ctx.drawImage(bg, 0, 0, 1100, 620);
+          if (bg && bg.complete && bg.naturalWidth > 0 && bg.naturalHeight > 0) {
+            const scale = Math.max(width / bg.naturalWidth, height / bg.naturalHeight);
+            const sourceW = width / scale;
+            const sourceH = height / scale;
+            const sourceX = (bg.naturalWidth - sourceW) / 2;
+            const sourceY = (bg.naturalHeight - sourceH) / 2;
+            ctx.drawImage(bg, sourceX, sourceY, sourceW, sourceH, 0, 0, width, height);
             ctx.fillStyle = "#02061755";
-            ctx.fillRect(0, 0, 1100, 620);
+            ctx.fillRect(0, 0, width, height);
             return;
           }
 
-          const g = ctx.createLinearGradient(0, 0, 0, 620);
+          const g = ctx.createLinearGradient(0, 0, 0, height);
           g.addColorStop(0, "#263a5b");
           g.addColorStop(0.6, "#17233a");
           g.addColorStop(1, "#0b1020");
           ctx.fillStyle = g;
-          ctx.fillRect(0, 0, 1100, 620);
+          ctx.fillRect(0, 0, width, height);
           ctx.fillStyle = "#f6c45318";
           ctx.beginPath();
-          ctx.ellipse(550, 350, 445, 115, 0, 0, Math.PI * 2);
+          ctx.ellipse(centerX, 350, 570, 115, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.strokeStyle = "#f6c45355";
           ctx.lineWidth = 4;
           ctx.beginPath();
-          ctx.ellipse(550, 350, 455, 122, 0, 0, Math.PI * 2);
+          ctx.ellipse(centerX, 350, 580, 122, 0, 0, Math.PI * 2);
           ctx.stroke();
         }
 
@@ -1394,7 +1468,7 @@
 
           ctx.fillStyle = listening ? "#34d399" : micRequested ? "#f6c453" : "#fca5a5";
           ctx.font = "bold 16px system-ui";
-          ctx.fillText(listening ? "Mic listening" : micRequested ? "Mic reconnecting" : "Mic off", layout.mic.x, layout.mic.y);
+          ctx.fillText(listening ? "Mic listening • 1s scan" : micRequested ? "Mic reconnecting" : "Mic off", layout.mic.x, layout.mic.y);
 
           rr(layout.message.x, layout.message.y, layout.message.w, layout.message.h, 18, "#07101dd9", "#f6c45366");
           ctx.textAlign = "center";
@@ -1404,24 +1478,24 @@
           ctx.textAlign = "left";
 
           drawCommandPanel(layout.playerCommand, "P1 COMMAND", state.accepted, "left");
-          drawCommandPanel(layout.commandReference, "COMMANDS", "Attack | Defence | Block | Ultimate/Skill");
+          drawCommandPanel(layout.commandReference, "COMMANDS • 1s VOICE WINDOW", "Attack | Defence | Block | Ultimate/Skill");
           drawCommandPanel(layout.enemyCommand, "P2 / AI COMMAND", state.enemyAccepted, "right");
 
           if (state.phase === "ended") {
             ctx.fillStyle = "#020617b8";
-            ctx.fillRect(0, 0, 1100, 620);
-            rr(275, 175, 550, 250, 26, "#0f172af2", "#f6c453dd");
+            ctx.fillRect(0, 0, cfg.viewport.width, cfg.viewport.height);
+            rr(cfg.viewport.centerX - 275, 175, 550, 250, 26, "#0f172af2", "#f6c453dd");
             ctx.textAlign = "center";
             ctx.font = "bold 44px system-ui";
             ctx.fillStyle = state.phase === "ended" ? state.result.includes("WIN") ? "#34d399" : state.result.includes("LOSE") ? "#ef4444" : "#f6c453" : "#fff4d6";
-            ctx.fillText(state.result, 550, 250);
+            ctx.fillText(state.result, cfg.viewport.centerX, 250);
             ctx.fillStyle = "#cbd5e1";
             ctx.font = "20px system-ui";
-            ctx.fillText("Say: Attack, Defence, Block, Ultimate, or Skill", 550, 305);
-            ctx.fillText("Or use canvas buttons / keys A, D, B, U", 550, 340);
+            ctx.fillText("Say: Attack, Defence, Block, Ultimate, or Skill", cfg.viewport.centerX, 305);
+            ctx.fillText("Or use canvas buttons / keys A, D, B, U", cfg.viewport.centerX, 340);
             ctx.fillStyle = "#f6c453";
             ctx.font = "bold 21px system-ui";
-            ctx.fillText("Choose Dragon Again", 550, 385);
+            ctx.fillText("Choose Dragon Again", cfg.viewport.centerX, 385);
             ctx.textAlign = "left";
           }
 
@@ -1453,7 +1527,8 @@
           recognition.onstart = () => {
             listening = true;
             speechError = "";
-            state.note = "Listening. Say Attack / Defence / Block / Ultimate or Skill.";
+            startVoiceScanner();
+            state.note = "Listening. Commands execute once per second in spoken order.";
             log("mic_start");
           };
 
@@ -1471,7 +1546,10 @@
 
           recognition.onerror = (e) => {
             const fatal = ["not-allowed", "service-not-allowed", "audio-capture"].includes(e.error);
-            if (fatal) micRequested = false;
+            if (fatal) {
+              micRequested = false;
+              stopVoiceScanner();
+            }
             speechError = e.error === "no-speech"
               ? "No speech heard. Microphone will keep listening."
               : e.error === "aborted" && !micRequested
@@ -1489,26 +1567,36 @@
                 text: alternative.transcript,
                 normalized: normalize(alternative.transcript),
                 confidence: alternative.confidence,
-                cmd: commandFromSpeech(alternative.transcript)
+                commands: commandsFromSpeech(alternative.transcript)
               }));
-              const best = alternatives.find((alternative) => alternative.cmd) || alternatives[0];
+              const best = alternatives.reduce((selected, alternative) => {
+                if (!selected) return alternative;
+                if (alternative.commands.length !== selected.commands.length) {
+                  return alternative.commands.length > selected.commands.length ? alternative : selected;
+                }
+                return alternative.confidence > selected.confidence ? alternative : selected;
+              }, null);
               state.lastHeard = best?.normalized || "-";
 
               if (e.results[i].isFinal) {
                 const now = performance.now();
-                const signature = `${best?.cmd || "unknown"}:${best?.normalized || ""}`;
-                const duplicate = signature === lastVoiceCommand.signature && now - lastVoiceCommand.at < 650;
-                log("speech_final", { alternatives, cmd: best?.cmd || null, duplicate });
+                const signature = `${best?.commands.join(",") || "unknown"}:${best?.normalized || ""}`;
+                const duplicate = signature === lastVoiceCommand.signature && now - lastVoiceCommand.at < cfg.voice.duplicateWindowMs;
+                log("speech_final", { alternatives, commands: best?.commands || [], duplicate });
 
                 if (duplicate) continue;
                 lastVoiceCommand = { signature, at: now };
-                if (best?.cmd) useCommand(best.cmd, "voice");
-                else state.message = "Not recognized. Say Attack, Defence, Block, Ultimate, or Skill.";
+                if (best?.commands.length && state.phase === "playing") {
+                  voiceCommandQueue.push(...best.commands);
+                  state.note = `Queued: ${best.commands.map((command) => command.toUpperCase()).join(" → ")}`;
+                } else if (!best?.commands.length && state.phase === "playing") {
+                  state.message = "Not recognized. Say Attack, Defence, Block, Ultimate, or Skill.";
+                }
               }
             }
           };
 
-          state.note = "Voice is supported. Press Start Mic to play.";
+          state.note = "Voice is supported. Commands scan every 1 second in spoken order.";
         }
 
         canvas.addEventListener("pointerup", (e) => {
