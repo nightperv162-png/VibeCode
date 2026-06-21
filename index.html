@@ -40,6 +40,7 @@
         const canvas = document.getElementById("game");
         const ctx = canvas.getContext("2d");
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const svgDataUri = (svg) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
         const cfg = {
           matchTime: 60,
           maxHp: 100,
@@ -47,19 +48,64 @@
           ultimateDamage: 35,
           enemyDamage: 10,
           attackCd: 1.0,
-          defenceCd: 5.0,
-          blockCd: 2.2,
+          defenceCd: 4.0,
+          blockCd: 7.0,
           ultimateCd: 9.0,
           baseDefenceTime: 3.0,
-          defenceReduce: 0.35,
-          blockActiveTime: 0.95,
+          defenceReduce: 0.5,
+          blockActiveTime: 1.0,
           castWarningTime: 0.35,
           projectileTravelTime: 0.65,
           enemyMinWait: 1.3,
           enemyMaxWait: 2.4,
+          progression: {
+            enemyHpPerStage: 18,
+            enemyDamagePerStage: 2,
+            enemyMinWaitStep: 0.04,
+            enemyMaxWaitStep: 0.08,
+            enemyMinWaitFloor: 1.1,
+            enemyMaxWaitFloor: 1.55,
+            vitalityHpPerRank: 12,
+            powerPerRank: 0.1,
+            guardDurationPerRank: 0.2,
+            guardBlockCdPerRank: 0.25,
+            blockCdFloor: 5,
+            focusPerRank: 0.05,
+            focusMultiplierFloor: 0.65,
+            enemyRoster: [
+              { name: "Moss Warden", role: "Forest Rival", assetKey: "enemy", elementKey: "enemy", color: "#a855f7" },
+              { name: "Ember Tyrant", role: "Flame Rival", assetKey: "ember", elementKey: "ember", color: "#fb923c" },
+              { name: "Tide Sentinel", role: "Tide Rival", assetKey: "tide", elementKey: "tide", color: "#60a5fa" },
+              { name: "Ancient Moss", role: "Elder Rival", assetKey: "moss", elementKey: "moss", color: "#34d399" }
+            ],
+            upgrades: {
+              power: { name: "Power", color: "#fb923c", maxRank: 8, description: "+10% Attack and Ultimate damage" },
+              vitality: { name: "Vitality", color: "#34d399", maxRank: 8, description: "+12 maximum HP" },
+              guard: { name: "Guard", color: "#60a5fa", maxRank: 8, description: "+0.2s Defence; -0.25s Block cooldown" },
+              focus: { name: "Focus", color: "#a78bfa", maxRank: 7, description: "-5% Attack and Ultimate cooldowns" }
+            }
+          },
           assets: {
             background: "./dragon-fighter-prototype/dragon-fighter/public/assets/backgrounds/arena.png",
-            enemy: "./dragon-fighter-prototype/dragon-fighter/public/assets/dragons/moss-boss-dragon-enemy.png"
+            enemy: "./dragon-fighter-prototype/dragon-fighter/public/assets/dragons/moss-boss-dragon-enemy.png",
+            projectileAttack: svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 90"><defs><linearGradient id="flame" x1="0" x2="1"><stop stop-color="#7c2d12"/><stop offset=".5" stop-color="#fb923c"/><stop offset="1" stop-color="#fff7cc"/></linearGradient></defs><path fill="#fb923c" opacity=".42" d="M8 45 72 12 58 36l50 9-50 9 14 24z"/><path fill="url(#flame)" stroke="#fff1b8" stroke-width="4" d="M48 45c22-31 74-32 112 0-38 32-90 31-112 0Z"/><ellipse cx="130" cy="36" rx="14" ry="7" fill="#fff" opacity=".75"/></svg>`),
+            projectileUltimate: svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 110"><defs><radialGradient id="core"><stop stop-color="#fff"/><stop offset=".35" stop-color="#c4b5fd"/><stop offset="1" stop-color="#6d28d9"/></radialGradient></defs><path fill="#8b5cf6" opacity=".4" d="m6 55 82-45-22 34 72 11-72 11 22 34z"/><path fill="#4c1d95" stroke="#ddd6fe" stroke-width="5" d="M56 55c27-42 91-47 142 0-51 47-115 42-142 0Z"/><ellipse cx="142" cy="55" rx="38" ry="31" fill="url(#core)"/><path fill="none" stroke="#fff" stroke-width="5" opacity=".8" d="m132 35 18 13-13 9 16 17"/></svg>`),
+            projectileArcane: "./dragon-fighter-prototype/dragon-fighter/public/assets/Projectiles/1.png",
+            projectileUltimatePng: "./dragon-fighter-prototype/dragon-fighter/public/assets/Projectiles/2.png",
+            projectileTide: "./dragon-fighter-prototype/dragon-fighter/public/assets/Projectiles/3.png",
+            projectileEmber: "./dragon-fighter-prototype/dragon-fighter/public/assets/Projectiles/4.png"
+          },
+          projectiles: {
+            backgroundRemoval: { minLight: 235, maxSpread: 14, cropPadding: 8 },
+            playerByDragon: { ember: "ember", tide: "tide", moss: "arcane" },
+            enemyProfile: "arcane",
+            ultimateProfile: "ultimate",
+            profiles: {
+              arcane: { assetKey: "projectileArcane", baseRotation: Math.PI, headAnchorX: 0.12, headAnchorY: 0.5, widthScale: 6, heightScale: 3.4 },
+              ultimate: { assetKey: "projectileUltimatePng", baseRotation: Math.PI, headAnchorX: 0.12, headAnchorY: 0.5, widthScale: 7, heightScale: 3.7 },
+              tide: { assetKey: "projectileTide", baseRotation: Math.PI, headAnchorX: 0.12, headAnchorY: 0.5, widthScale: 6, heightScale: 3.4 },
+              ember: { assetKey: "projectileEmber", baseRotation: Math.PI, headAnchorX: 0.12, headAnchorY: 0.5, widthScale: 6, heightScale: 3.4 }
+            }
           },
           facing: {
             player: { flip: true, direction: "left" },
@@ -122,6 +168,10 @@
             imageH: 140,
             confirm: { x: 415, y: 510, w: 270, h: 48 }
           },
+          upgradeLayout: {
+            textAlign: "center",
+            cardTextInset: 17
+          },
           battleLayout: {
             playerDragon: { x: 360, y: 390, w: 358, h: 253, labelY: 226, hitX: 385, hitY: 370 },
             enemyDragon: { x: 766, y: 312, w: 170, h: 124, labelY: 204, hitX: 750, hitY: 300 },
@@ -159,6 +209,10 @@
             message: "Choose your dragon.",
             note: "Select a dragon, then confirm to battle.",
             result: "",
+            stage: 1,
+            victories: 0,
+            battleOutcome: null,
+            upgrades: { power: 0, vitality: 0, guard: 0, focus: 0 },
             cd: { attack: 0, defence: 0, block: 0, ultimate: 0 },
             defenceTimer: 0,
             blockTimer: 0,
@@ -171,29 +225,74 @@
 
         function modifiedAttackDamage(config, currentState) {
           const dragon = getSelectedDragon(config, currentState);
-          return Math.round(config.baseAttackDamage * dragon.modifiers.attackDamage);
+          const power = 1 + currentState.upgrades.power * config.progression.powerPerRank;
+          return Math.round(config.baseAttackDamage * dragon.modifiers.attackDamage * power);
         }
 
         function modifiedDefenceDuration(config, currentState) {
           const dragon = getSelectedDragon(config, currentState);
-          return config.baseDefenceTime * dragon.modifiers.defenceDuration;
+          const upgradedDuration = config.baseDefenceTime + currentState.upgrades.guard * config.progression.guardDurationPerRank;
+          return upgradedDuration * dragon.modifiers.defenceDuration;
         }
 
         function modifiedSkillCooldown(config, currentState) {
           const dragon = getSelectedDragon(config, currentState);
-          return config.ultimateCd * dragon.modifiers.skillCooldown;
+          return config.ultimateCd * dragon.modifiers.skillCooldown * getFocusMultiplier(config, currentState);
+        }
+
+        function getFocusMultiplier(config, currentState) {
+          return Math.max(config.progression.focusMultiplierFloor, 1 - currentState.upgrades.focus * config.progression.focusPerRank);
+        }
+
+        function modifiedUltimateDamage(config, currentState) {
+          const power = 1 + currentState.upgrades.power * config.progression.powerPerRank;
+          return Math.round(config.ultimateDamage * power);
+        }
+
+        function getPlayerMaxHp(config, currentState) {
+          return config.maxHp + currentState.upgrades.vitality * config.progression.vitalityHpPerRank;
+        }
+
+        function getEnemyStats(config, currentState) {
+          const stageIndex = Math.max(0, currentState.stage - 1);
+          const roster = config.progression.enemyRoster;
+          const template = roster[stageIndex % roster.length];
+          const cycle = Math.floor(stageIndex / roster.length);
+          return {
+            ...template,
+            name: cycle > 0 ? `${template.name} +${cycle}` : template.name,
+            maxHp: config.maxHp + stageIndex * config.progression.enemyHpPerStage,
+            damage: config.enemyDamage + stageIndex * config.progression.enemyDamagePerStage,
+            minWait: Math.max(config.progression.enemyMinWaitFloor, config.enemyMinWait - stageIndex * config.progression.enemyMinWaitStep),
+            maxWait: Math.max(config.progression.enemyMaxWaitFloor, config.enemyMaxWait - stageIndex * config.progression.enemyMaxWaitStep),
+            scale: Math.min(1.28, 1 + stageIndex * 0.025)
+          };
+        }
+
+        function getUpgrade(config, upgradeId) {
+          return config.progression.upgrades[upgradeId] || null;
+        }
+
+        function canApplyUpgrade(config, currentState, upgradeId) {
+          const upgrade = getUpgrade(config, upgradeId);
+          return Boolean(upgrade && currentState.upgrades[upgradeId] < upgrade.maxRank);
+        }
+
+        function allUpgradesMaxed(config, currentState) {
+          return Object.keys(config.progression.upgrades).every((upgradeId) => !canApplyUpgrade(config, currentState, upgradeId));
         }
 
         function getCommandCooldown(config, currentState, command) {
-          if (command === "attack") return config.attackCd;
+          if (command === "attack") return config.attackCd * getFocusMultiplier(config, currentState);
           if (command === "defence") return config.defenceCd;
-          if (command === "block") return config.blockCd;
+          if (command === "block") return Math.max(config.progression.blockCdFloor, config.blockCd - currentState.upgrades.guard * config.progression.guardBlockCdPerRank);
           if (command === "ultimate") return modifiedSkillCooldown(config, currentState);
           return 0;
         }
 
         function getBattleRenderData(config, currentState) {
           const selected = getSelectedDragon(config, currentState);
+          const enemy = getEnemyStats(config, currentState);
           return {
             player: {
               assetKey: selected.id,
@@ -203,9 +302,10 @@
               direction: config.facing.player.direction
             },
             enemy: {
-              assetKey: "enemy",
-              name: "Enemy Dragon",
-              role: "Rival",
+              assetKey: enemy.assetKey,
+              elementKey: enemy.elementKey,
+              name: enemy.name,
+              role: enemy.role,
               flip: config.facing.enemy.flip,
               direction: config.facing.enemy.direction
             }
@@ -216,24 +316,130 @@
           getSelectedDragon,
           modifiedAttackDamage,
           modifiedDefenceDuration,
+          modifiedUltimateDamage,
+          getPlayerMaxHp,
+          getEnemyStats,
+          getUpgrade,
+          canApplyUpgrade,
+          allUpgradesMaxed,
           getCommandCooldown,
           getBattleRenderData
         };
         const state = createInitialState(cfg);
 
         const images = {};
+        const projectileImages = {};
         const buttons = [];
         let recognition = null;
         let listening = false;
+        let micRequested = false;
+        let recognitionRestartTimer = null;
+        let speechError = "";
+        let lastVoiceCommand = { signature: "", at: 0 };
         let last = performance.now();
 
         const rand = (a, b) => a + Math.random() * (b - a);
         const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
         const log = (name, data = {}) => console.log("[DragonFighter]", name, data);
 
+        function removeConnectedLightBackground(imageData, width, height, settings) {
+          const data = imageData.data;
+          const total = width * height;
+          const visited = new Uint8Array(total);
+          const queue = new Int32Array(total);
+          let head = 0;
+          let tail = 0;
+
+          const isBackground = (pixelIndex) => {
+            const offset = pixelIndex * 4;
+            const r = data[offset];
+            const g = data[offset + 1];
+            const b = data[offset + 2];
+            return Math.min(r, g, b) >= settings.minLight && Math.max(r, g, b) - Math.min(r, g, b) <= settings.maxSpread;
+          };
+          const visit = (pixelIndex) => {
+            if (visited[pixelIndex] || !isBackground(pixelIndex)) return;
+            visited[pixelIndex] = 1;
+            queue[tail] = pixelIndex;
+            tail += 1;
+          };
+
+          for (let x = 0; x < width; x += 1) {
+            visit(x);
+            visit((height - 1) * width + x);
+          }
+          for (let y = 1; y < height - 1; y += 1) {
+            visit(y * width);
+            visit(y * width + width - 1);
+          }
+          while (head < tail) {
+            const pixelIndex = queue[head];
+            head += 1;
+            const x = pixelIndex % width;
+            const y = Math.floor(pixelIndex / width);
+            data[pixelIndex * 4 + 3] = 0;
+            if (x > 0) visit(pixelIndex - 1);
+            if (x < width - 1) visit(pixelIndex + 1);
+            if (y > 0) visit(pixelIndex - width);
+            if (y < height - 1) visit(pixelIndex + width);
+          }
+
+          let minX = width;
+          let minY = height;
+          let maxX = -1;
+          let maxY = -1;
+          for (let pixelIndex = 0; pixelIndex < total; pixelIndex += 1) {
+            if (data[pixelIndex * 4 + 3] === 0) continue;
+            const x = pixelIndex % width;
+            const y = Math.floor(pixelIndex / width);
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x);
+            maxY = Math.max(maxY, y);
+          }
+          return { minX, minY, maxX, maxY, removed: tail };
+        }
+
+        function prepareProjectileImage(image, settings) {
+          const source = document.createElement("canvas");
+          source.width = image.naturalWidth;
+          source.height = image.naturalHeight;
+          const sourceCtx = source.getContext("2d", { willReadFrequently: true });
+          sourceCtx.drawImage(image, 0, 0);
+          const imageData = sourceCtx.getImageData(0, 0, source.width, source.height);
+          const bounds = removeConnectedLightBackground(imageData, source.width, source.height, settings);
+          if (bounds.removed < source.width * source.height * 0.1 || bounds.maxX < bounds.minX || bounds.maxY < bounds.minY) {
+            throw new Error("Projectile background could not be isolated safely.");
+          }
+
+          const minX = Math.max(0, bounds.minX - settings.cropPadding);
+          const minY = Math.max(0, bounds.minY - settings.cropPadding);
+          const maxX = Math.min(source.width - 1, bounds.maxX + settings.cropPadding);
+          const maxY = Math.min(source.height - 1, bounds.maxY + settings.cropPadding);
+          const output = document.createElement("canvas");
+          output.width = maxX - minX + 1;
+          output.height = maxY - minY + 1;
+          output.getContext("2d").putImageData(imageData, -minX, -minY);
+          return output;
+        }
+
+        function isPngProjectileAsset(assetKey) {
+          return Object.values(cfg.projectiles.profiles).some((profile) => profile.assetKey === assetKey);
+        }
+
         function loadImage(key, src) {
           const image = new Image();
-          image.onload = () => log("asset_loaded", { key, src });
+          image.onload = () => {
+            log("asset_loaded", { key, src });
+            if (!isPngProjectileAsset(key)) return;
+            try {
+              projectileImages[key] = prepareProjectileImage(image, cfg.projectiles.backgroundRemoval);
+              log("projectile_processed", { key, width: projectileImages[key].width, height: projectileImages[key].height });
+            } catch (error) {
+              projectileImages[key] = null;
+              log("projectile_processing_failed", { key, message: error.message });
+            }
+          };
           image.onerror = () => log("asset_failed", { key, src });
           image.src = src;
           images[key] = image;
@@ -243,25 +449,28 @@
         cfg.dragons.forEach((dragon) => loadImage(dragon.id, dragon.asset));
 
         function reset() {
+          const playerMaxHp = core.getPlayerMaxHp(cfg, state);
+          const enemy = core.getEnemyStats(cfg, state);
           state.phase = "playing";
           state.time = cfg.matchTime;
-          state.playerHp = cfg.maxHp;
-          state.enemyHp = cfg.maxHp;
+          state.playerHp = playerMaxHp;
+          state.enemyHp = enemy.maxHp;
           state.lastHeard = "-";
           state.accepted = "-";
           state.enemyAccepted = "-";
           state.playerState = "Ready";
           state.enemyState = "Ready";
-          state.message = "Battle started. Say Attack, Defence, Block, or Ultimate.";
+          state.message = `Stage ${state.stage}: ${enemy.name} approaches.`;
           state.note = "Use canvas buttons, keyboard, or voice commands.";
           state.result = "";
+          state.battleOutcome = null;
           state.cd.attack = 0;
           state.cd.defence = 0;
           state.cd.block = 0;
           state.cd.ultimate = 0;
           state.defenceTimer = 0;
           state.blockTimer = 0;
-          state.enemyTimer = rand(cfg.enemyMinWait, cfg.enemyMaxWait);
+          state.enemyTimer = rand(enemy.minWait, enemy.maxWait);
           state.shake = 0;
           state.particles = [];
           state.pendingAttacks = [];
@@ -271,6 +480,10 @@
         function chooseDragonAgain() {
           state.phase = "select";
           state.selectedDragonId = null;
+          state.stage = 1;
+          state.victories = 0;
+          state.battleOutcome = null;
+          state.upgrades = { power: 0, vitality: 0, guard: 0, focus: 0 };
           state.time = cfg.matchTime;
           state.playerHp = cfg.maxHp;
           state.enemyHp = cfg.maxHp;
@@ -305,12 +518,12 @@
 
         function commandFromSpeech(text) {
           const words = normalize(text).split(" ").filter(Boolean);
-          state.lastHeard = words.join(" ") || "-";
-
-          if (words.includes("attack")) return "attack";
-          if (words.includes("block")) return "block";
-          if (words.includes("defence") || words.includes("defense")) return "defence";
-          if (words.includes("ultimate")) return "ultimate";
+          for (const word of words) {
+            if (word === "attack") return "attack";
+            if (word === "block") return "block";
+            if (word === "defence" || word === "defense") return "defence";
+            if (word === "ultimate" || word === "skill") return "ultimate";
+          }
           return null;
         }
 
@@ -320,15 +533,16 @@
             state.note = "Pick a dragon first.";
             return;
           }
-          state.phase = "playing";
-          state.message = `${dragon.name} enters battle.`;
-          state.note = "Use canvas buttons, keyboard, or voice commands.";
+          reset();
+          state.message = `${dragon.name} enters Stage ${state.stage}.`;
           state.playerState = dragon.role;
-          state.enemyState = "Ready";
-          state.accepted = "-";
-          state.enemyAccepted = "-";
-          state.pendingAttacks = [];
           log("dragon_confirmed", { dragonId: dragon.id, role: dragon.role });
+        }
+
+        function getProjectileProfileId(source, command) {
+          if (command === "ultimate") return cfg.projectiles.ultimateProfile;
+          if (source === "enemy") return cfg.projectiles.enemyProfile;
+          return cfg.projectiles.playerByDragon[state.selectedDragonId] || cfg.projectiles.enemyProfile;
         }
 
         function scheduleAttack(source, target, command, damage, color, size) {
@@ -341,6 +555,8 @@
             damage,
             color,
             size,
+            projectileProfileId: getProjectileProfileId(source, command),
+            assetKey: command === "ultimate" ? "projectileUltimate" : "projectileAttack",
             elapsed: 0,
             castTime: cfg.castWarningTime,
             travelTime: cfg.projectileTravelTime,
@@ -349,6 +565,7 @@
             endX: targetLayout.hitX,
             endY: targetLayout.hitY - 18
           });
+          hit(sourceLayout.hitX, sourceLayout.hitY - 28, color, command === "ultimate" ? 14 : 8);
         }
 
         function resolveAttack(attack) {
@@ -357,9 +574,8 @@
           const defended = attack.target === "player" && state.defenceTimer > 0;
 
           if (blocked) {
-            state.blockTimer = 0;
             state.playerState = "Blocked";
-            state.message = "Block negated the hit.";
+            state.message = "Block negated all damage.";
             shield(targetLayout.hitX, targetLayout.hitY, "#f6c453", 22);
             hit(targetLayout.hitX, targetLayout.hitY, "#f6c453", 10);
             log("attack_blocked", { command: attack.command, source: attack.source });
@@ -369,11 +585,11 @@
           const damage = attack.target === "player" && defended ? Math.round(attack.damage * cfg.defenceReduce) : attack.damage;
 
           if (attack.target === "player") {
-            state.playerHp = clamp(state.playerHp - damage, 0, cfg.maxHp);
+            state.playerHp = clamp(state.playerHp - damage, 0, core.getPlayerMaxHp(cfg, state));
             state.playerState = defended ? "Defended" : "Hit";
             state.message = defended ? `Defence reduced damage. You -${damage} HP` : `Enemy hit. You -${damage} HP`;
           } else {
-            state.enemyHp = clamp(state.enemyHp - damage, 0, cfg.maxHp);
+            state.enemyHp = clamp(state.enemyHp - damage, 0, core.getEnemyStats(cfg, state).maxHp);
             state.enemyState = attack.command === "ultimate" ? "Crushed" : "Hit";
             state.message = attack.command === "ultimate" ? `Ultimate hit. Enemy -${damage} HP` : `Attack hit. Enemy -${damage} HP`;
           }
@@ -427,7 +643,19 @@
             state.playerState = "Ultimate Cast";
             state.enemyState = "Danger";
             state.message = "Ultimate charging. Heavy projectile incoming.";
-            scheduleAttack("player", "enemy", "ultimate", cfg.ultimateDamage, "#a78bfa", 32);
+            scheduleAttack("player", "enemy", "ultimate", core.modifiedUltimateDamage(cfg, state), "#a78bfa", 32);
+          }
+        }
+
+        function startRecognition() {
+          if (!recognition || listening || !micRequested) return;
+
+          try {
+            recognition.start();
+          } catch (e) {
+            state.note = "Microphone is busy. Retrying...";
+            clearTimeout(recognitionRestartTimer);
+            recognitionRestartTimer = setTimeout(startRecognition, 350);
           }
         }
 
@@ -437,23 +665,29 @@
             return;
           }
 
-          try {
+          if (micRequested) {
+            micRequested = false;
+            clearTimeout(recognitionRestartTimer);
             if (listening) recognition.stop();
-            else recognition.start();
-          } catch (e) {
-            state.note = "Could not start microphone. Reload or use A/D/B/U.";
+            else state.note = "Mic is off. Press Start Mic to listen again.";
+            return;
           }
+
+          micRequested = true;
+          speechError = "";
+          startRecognition();
         }
 
         function enemyAttack() {
           if (state.phase !== "playing") return;
+          const enemy = core.getEnemyStats(cfg, state);
 
           state.enemyState = "Attack Cast";
           state.enemyAccepted = "ATTACK";
           state.playerState = state.blockTimer > 0 ? "Block" : state.playerState;
           state.message = "Enemy attack charging. Block before impact.";
-          scheduleAttack("enemy", "player", "attack", cfg.enemyDamage, "#ef4444", 18);
-          state.enemyTimer = rand(cfg.enemyMinWait, cfg.enemyMaxWait);
+          scheduleAttack("enemy", "player", "attack", enemy.damage, enemy.color, 18 + Math.min(8, state.stage - 1));
+          state.enemyTimer = rand(enemy.minWait, enemy.maxWait);
           log("enemy_attack_cast");
         }
 
@@ -469,10 +703,42 @@
         }
 
         function finish(result) {
-          state.phase = "ended";
+          if (state.phase !== "playing") return;
+          const won = result.includes("WIN");
+          state.phase = "upgrade";
           state.result = result;
-          state.message = "Choose Dragon Again to pick a new dragon.";
+          state.battleOutcome = { result, won, stage: state.stage };
+          if (won) state.victories += 1;
+          state.pendingAttacks = [];
+          state.message = won ? `Stage ${state.stage} cleared. Choose an upgrade.` : `Stage ${state.stage} holds. Upgrade and retry.`;
+          state.note = "Choose one upgrade for your dragon.";
           log("finish", { result, playerHp: state.playerHp, enemyHp: state.enemyHp });
+        }
+
+        function beginBattleAfterReward(rewardMessage) {
+          const outcome = state.battleOutcome;
+          if (!outcome) return;
+          if (outcome.won) state.stage += 1;
+          const nextMessage = outcome.won
+            ? `Stage ${state.stage} begins. A stronger dragon appears.`
+            : `Retrying Stage ${state.stage}. Adapt and overcome.`;
+          reset();
+          state.message = nextMessage;
+          state.note = rewardMessage;
+        }
+
+        function applyUpgrade(upgradeId) {
+          if (state.phase !== "upgrade" || !core.canApplyUpgrade(cfg, state, upgradeId)) return;
+          const upgrade = core.getUpgrade(cfg, upgradeId);
+          state.upgrades[upgradeId] += 1;
+          const rank = state.upgrades[upgradeId];
+          log("upgrade_applied", { upgradeId, rank, stage: state.stage });
+          beginBattleAfterReward(`${upgrade.name} upgraded to rank ${rank}.`);
+        }
+
+        function continueWithMaxUpgrades() {
+          if (state.phase !== "upgrade" || !core.allUpgradesMaxed(cfg, state)) return;
+          beginBattleAfterReward("All upgrades are maxed.");
         }
 
         function hit(x, y, color, count) {
@@ -512,8 +778,14 @@
             state.cd[k] = Math.max(0, state.cd[k] - dt);
           });
 
-          if (state.defenceTimer > 0) state.defenceTimer = Math.max(0, state.defenceTimer - dt);
-          if (state.blockTimer > 0) state.blockTimer = Math.max(0, state.blockTimer - dt);
+          const defenceWasActive = state.defenceTimer > 0;
+          const blockWasActive = state.blockTimer > 0;
+          if (defenceWasActive) state.defenceTimer = Math.max(0, state.defenceTimer - dt);
+          if (blockWasActive) state.blockTimer = Math.max(0, state.blockTimer - dt);
+          if (blockWasActive && state.blockTimer === 0 && state.defenceTimer > 0) state.playerState = "Defence";
+          if ((defenceWasActive || blockWasActive) && state.defenceTimer === 0 && state.blockTimer === 0 && ["Defence", "Defended", "Block", "Blocked"].includes(state.playerState)) {
+            state.playerState = "Ready";
+          }
 
           state.particles.forEach((p) => {
             p.life -= dt;
@@ -534,8 +806,11 @@
           });
           const impacting = state.pendingAttacks.filter((attack) => attack.elapsed >= attack.castTime + attack.travelTime);
           state.pendingAttacks = state.pendingAttacks.filter((attack) => attack.elapsed < attack.castTime + attack.travelTime);
-          impacting.forEach(resolveAttack);
+          impacting.forEach((attack) => {
+            if (state.phase === "playing") resolveAttack(attack);
+          });
 
+          if (state.phase !== "playing") return;
           if (state.enemyTimer <= 0) enemyAttack();
           if (state.time <= 0) checkEnd();
         }
@@ -554,24 +829,25 @@
           }
         }
 
-        function hpBar(x, y, w, h, value, color, label) {
+        function hpBar(x, y, w, h, value, maxValue, color, label) {
           rr(x, y, w, h, 10, "#0008", "#ffffff33");
-          rr(x + 3, y + 3, (w - 6) * clamp(value / cfg.maxHp, 0, 1), h - 6, 8, color, null);
+          rr(x + 3, y + 3, (w - 6) * clamp(value / maxValue, 0, 1), h - 6, 8, color, null);
           ctx.textAlign = "center";
           ctx.fillStyle = "#fff4d6";
           ctx.font = "bold 16px system-ui";
-          ctx.fillText(`${label}: ${Math.ceil(value)}/${cfg.maxHp}`, x + w / 2, y + h - 8);
+          ctx.fillText(`${label}: ${Math.ceil(value)}/${maxValue}`, x + w / 2, y + h - 8);
           ctx.textAlign = "left";
         }
 
         function canvasButton(id, x, y, w, h, label, fill, border) {
           buttons.push({ id, x, y, w, h });
+          ctx.save();
           rr(x, y, w, h, 18, fill, border);
           ctx.textAlign = "center";
           ctx.fillStyle = "#fff4d6";
           ctx.font = "bold 15px system-ui";
           ctx.fillText(label, x + w / 2, y + 27);
-          ctx.textAlign = "left";
+          ctx.restore();
         }
 
         function drawControls() {
@@ -597,7 +873,7 @@
             return;
           }
 
-          canvasButton("mic", 82, 548, 132, 44, listening ? "Stop Mic" : "Start Mic", listening ? "#164e35dd" : "#f6c453dd", "#f6c453");
+          canvasButton("mic", 82, 548, 132, 44, micRequested ? "Stop Mic" : "Start Mic", listening ? "#164e35dd" : micRequested ? "#713f12dd" : "#f6c453dd", "#f6c453");
           canvasButton("attack", 238, 548, 108, 44, "Attack", "#402313dd", "#fb923c");
           canvasButton("defence", 368, 548, 108, 44, "Defence", "#16324add", "#60a5fa");
           canvasButton("block", 498, 548, 108, 44, "Block", "#3b2b12dd", "#f6c453");
@@ -649,6 +925,70 @@
           const selectedDragon = core.getSelectedDragon(cfg, state);
           state.note = selectedDragon ? `${selectedDragon.name}: ${selectedDragon.role}` : state.note;
           drawControls();
+          ctx.textAlign = "left";
+        }
+
+        function drawUpgradeScreen() {
+          buttons.length = 0;
+          drawArena();
+          ctx.fillStyle = "#020617d9";
+          ctx.fillRect(0, 0, 1100, 620);
+
+          const outcome = state.battleOutcome;
+          const won = Boolean(outcome?.won);
+          const upgradeLayout = cfg.upgradeLayout;
+          ctx.textAlign = upgradeLayout.textAlign;
+          ctx.fillStyle = won ? "#34d399" : state.result === "DRAW" ? "#f6c453" : "#fca5a5";
+          ctx.font = "bold 38px system-ui";
+          ctx.fillText(state.result || "BATTLE COMPLETE", 550, 58);
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 23px system-ui";
+          ctx.fillText(won ? `Stage ${state.stage} cleared — prepare for Stage ${state.stage + 1}` : `Stage ${state.stage} will be retried`, 550, 94);
+          ctx.fillStyle = "#cbd5e1";
+          ctx.font = "16px system-ui";
+          ctx.fillText("Choose one upgrade. The next battle begins immediately.", 550, 124);
+
+          const upgradeIds = Object.keys(cfg.progression.upgrades);
+          upgradeIds.forEach((upgradeId, index) => {
+            const upgrade = core.getUpgrade(cfg, upgradeId);
+            const rank = state.upgrades[upgradeId];
+            const available = core.canApplyUpgrade(cfg, state, upgradeId);
+            const x = 35 + index * 265;
+            const y = 158;
+            const w = 235;
+            const h = 330;
+            ctx.textAlign = upgradeLayout.textAlign;
+            rr(x, y, w, h, 22, available ? "#0f172af2" : "#111827dd", available ? upgrade.color : "#64748b");
+            ctx.fillStyle = upgrade.color;
+            ctx.font = "bold 25px system-ui";
+            ctx.fillText(upgrade.name, x + w / 2, y + 48);
+            ctx.fillStyle = "#fff4d6";
+            ctx.font = "bold 17px system-ui";
+            ctx.fillText(`Rank ${rank}/${upgrade.maxRank}`, x + w / 2, y + 80);
+            ctx.fillStyle = "#cbd5e1";
+            ctx.font = "15px system-ui";
+            wrapText(upgrade.description, x + w / 2, y + 125, w - upgradeLayout.cardTextInset * 2, 22);
+
+            const preview = upgradeId === "power"
+              ? `Attack ${core.modifiedAttackDamage(cfg, state)} → ${Math.round(core.modifiedAttackDamage(cfg, state) * (1 + cfg.progression.powerPerRank / (1 + rank * cfg.progression.powerPerRank)))}`
+              : upgradeId === "vitality"
+                ? `Max HP ${core.getPlayerMaxHp(cfg, state)} → ${core.getPlayerMaxHp(cfg, state) + cfg.progression.vitalityHpPerRank}`
+                : upgradeId === "guard"
+                  ? `Defence ${core.modifiedDefenceDuration(cfg, state).toFixed(1)}s`
+                  : `Attack CD ${core.getCommandCooldown(cfg, state, "attack").toFixed(2)}s`;
+            ctx.fillStyle = "#93c5fd";
+            ctx.font = "bold 14px system-ui";
+            ctx.fillText(available ? preview : "Maximum rank reached", x + w / 2, y + 230);
+            canvasButton(`upgrade:${upgradeId}`, x + 26, y + 265, w - 52, 46, available ? `Choose ${index + 1}` : "MAX", available ? "#1e293bdd" : "#334155aa", available ? upgrade.color : "#64748b");
+          });
+
+          canvasButton("chooseDragonAgain", 55, 535, 190, 44, "Change Dragon", "#102a4cdd", "#87d5ff");
+          if (core.allUpgradesMaxed(cfg, state)) {
+            canvasButton("continueMax", 420, 525, 260, 54, "Continue — All Maxed", "#164e35dd", "#34d399");
+          }
+          ctx.fillStyle = "#94a3b8";
+          ctx.font = "14px system-ui";
+          ctx.fillText("Keys 1–4 choose an upgrade", 550, 607);
           ctx.textAlign = "left";
         }
 
@@ -734,13 +1074,6 @@
           ctx.ellipse(0, h * 0.42, w * 0.42, 23, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.drawImage(image, -w / 2, -h / 2, w, h);
-          if (key !== "enemy" && (state.defenceTimer > 0 || state.blockTimer > 0)) {
-            ctx.strokeStyle = state.blockTimer > 0 ? "#f6c453dd" : "#60a5facc";
-            ctx.lineWidth = state.blockTimer > 0 ? 10 : 7;
-            ctx.beginPath();
-            ctx.arc(0, 0, Math.max(w, h) * (state.blockTimer > 0 ? 0.62 : 0.55), 0, Math.PI * 2);
-            ctx.stroke();
-          }
           ctx.restore();
         }
 
@@ -777,19 +1110,20 @@
         function drawPanelCooldowns(layout, side) {
           const y = layout.y + 101;
           if (side === "player") {
-            miniCooldown(layout.x + 17, y, "ATK", state.cd.attack, cfg.attackCd, "#fb923c", 82);
+            miniCooldown(layout.x + 17, y, "ATK", state.cd.attack, core.getCommandCooldown(cfg, state, "attack"), "#fb923c", 82);
             miniCooldown(layout.x + 105, y, "DEF", state.cd.defence, cfg.defenceCd, "#60a5fa", 82);
-            miniCooldown(layout.x + 193, y, "BLK", state.cd.block, cfg.blockCd, "#f6c453", 82);
-            miniCooldown(layout.x + 281, y, "ULT", state.cd.ultimate, cfg.ultimateCd, "#a78bfa", 82);
+            miniCooldown(layout.x + 193, y, "BLK", state.cd.block, core.getCommandCooldown(cfg, state, "block"), "#f6c453", 82);
+            miniCooldown(layout.x + 281, y, "ULT", state.cd.ultimate, core.getCommandCooldown(cfg, state, "ultimate"), "#a78bfa", 82);
             return;
           }
 
-          miniCooldown(layout.x + 22, y, "ATK", state.enemyTimer, cfg.enemyMaxWait, "#fb923c");
+          const enemy = core.getEnemyStats(cfg, state);
+          miniCooldown(layout.x + 22, y, "ATK", state.enemyTimer, enemy.maxWait, enemy.color);
           miniCooldown(layout.x + 121, y, "DEF", 0, cfg.defenceCd, "#60a5fa");
           miniCooldown(layout.x + 220, y, "ULT", 0, cfg.ultimateCd, "#a78bfa");
         }
 
-        function drawStatusPanel(layout, title, subtitle, hp, color, elementKey) {
+        function drawStatusPanel(layout, title, subtitle, hp, maxHp, color, elementKey) {
           rr(layout.x, layout.y, layout.w, layout.h, 18, "#07101dcc", "#ffffff22");
           drawElementIcon(layout.x + 26, layout.y + 34, elementKey);
           ctx.fillStyle = "#fff4d6";
@@ -798,7 +1132,7 @@
           ctx.fillStyle = "#cbd5e1";
           ctx.font = "14px system-ui";
           ctx.fillText(subtitle, layout.x + 23, layout.y + 96);
-          hpBar(layout.x + 23, layout.y + 50, layout.w - 60, 32, hp, color, "HP");
+          hpBar(layout.x + 23, layout.y + 50, layout.w - 60, 32, hp, maxHp, color, "HP");
         }
 
         function drawStateLabel(text, x, y) {
@@ -829,6 +1163,79 @@
           ctx.textAlign = "left";
         }
 
+        function drawGuardEffect(layout) {
+          const blockActive = state.blockTimer > 0;
+          const defenceActive = state.defenceTimer > 0;
+          if (!blockActive && !defenceActive) return;
+
+          const now = performance.now() / 1000;
+          const color = blockActive ? "#f6c453" : "#60a5fa";
+          const radius = Math.max(layout.w, layout.h) * (blockActive ? 0.56 : 0.5);
+          const pulse = 1 + Math.sin(now * (blockActive ? 12 : 7)) * 0.025;
+
+          ctx.save();
+          ctx.translate(layout.x, layout.y);
+          ctx.scale(pulse, pulse);
+          ctx.shadowColor = color;
+          ctx.shadowBlur = blockActive ? 28 : 18;
+          ctx.fillStyle = blockActive ? "#f6c45316" : "#60a5fa12";
+          ctx.strokeStyle = color;
+          ctx.lineWidth = blockActive ? 9 : 6;
+          ctx.beginPath();
+          if (blockActive) {
+            for (let i = 0; i < 6; i += 1) {
+              const angle = -Math.PI / 2 + i * Math.PI / 3;
+              const px = Math.cos(angle) * radius;
+              const py = Math.sin(angle) * radius * 0.7;
+              if (i === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+          } else {
+            ctx.ellipse(0, 0, radius, radius * 0.7, 0, 0, Math.PI * 2);
+          }
+          ctx.fill();
+          ctx.stroke();
+
+          if (!blockActive) {
+            ctx.globalAlpha = 0.65;
+            ctx.lineWidth = 3;
+            ctx.setLineDash([20, 14]);
+            ctx.lineDashOffset = -now * 36;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, radius * 0.86, radius * 0.59, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          const remaining = blockActive ? state.blockTimer : state.defenceTimer;
+          ctx.save();
+          ctx.textAlign = "center";
+          ctx.font = "bold 15px system-ui";
+          ctx.fillStyle = color;
+          ctx.fillText(`${blockActive ? "BLOCK" : "DEFENCE"} ${remaining.toFixed(1)}s`, layout.x, layout.y + layout.h * 0.58);
+          ctx.restore();
+        }
+
+        function drawEnemyTierAura(layout, enemy) {
+          const now = performance.now() / 1000;
+          const radius = Math.max(layout.w, layout.h) * 0.42 * enemy.scale;
+          ctx.save();
+          ctx.translate(layout.x, layout.y);
+          ctx.globalAlpha = 0.28 + Math.sin(now * 4 + state.stage) * 0.08;
+          ctx.strokeStyle = enemy.color;
+          ctx.lineWidth = 5 + Math.min(7, state.stage * 0.6);
+          ctx.shadowColor = enemy.color;
+          ctx.shadowBlur = 24;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, radius, radius * 0.62, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.globalAlpha = 0.12;
+          ctx.fillStyle = enemy.color;
+          ctx.fill();
+          ctx.restore();
+        }
+
         function drawPendingAttack(attack) {
           const casting = attack.elapsed < attack.castTime;
           const sourcePulse = clamp(attack.elapsed / attack.castTime, 0, 1);
@@ -854,27 +1261,56 @@
           const y = attack.startY + (attack.endY - attack.startY) * t;
           const radius = attack.size * (1 - t * 0.2);
           const angle = Math.atan2(attack.endY - attack.startY, attack.endX - attack.startX);
+          const trailT = clamp(t - 0.18, 0, 1);
+          const trailX = attack.startX + (attack.endX - attack.startX) * trailT;
+          const trailY = attack.startY + (attack.endY - attack.startY) * trailT;
+
+          ctx.save();
+          ctx.globalAlpha = 0.5;
+          ctx.strokeStyle = attack.color;
+          ctx.lineWidth = radius * (attack.command === "ultimate" ? 1.15 : 0.72);
+          ctx.lineCap = "round";
+          ctx.shadowColor = attack.color;
+          ctx.shadowBlur = 18;
+          ctx.beginPath();
+          ctx.moveTo(trailX, trailY);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+          ctx.restore();
+
+          const profile = cfg.projectiles.profiles[attack.projectileProfileId];
+          const pngProjectile = profile ? projectileImages[profile.assetKey] : null;
+          if (pngProjectile) {
+            const width = radius * profile.widthScale;
+            const height = radius * profile.heightScale;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle + profile.baseRotation);
+            ctx.shadowColor = attack.color;
+            ctx.shadowBlur = attack.command === "ultimate" ? 24 : 14;
+            ctx.drawImage(pngProjectile, -width * profile.headAnchorX, -height * profile.headAnchorY, width, height);
+            ctx.restore();
+            return;
+          }
 
           ctx.save();
           ctx.translate(x, y);
           ctx.rotate(angle);
           ctx.shadowColor = attack.color;
           ctx.shadowBlur = attack.command === "ultimate" ? 24 : 14;
-          ctx.fillStyle = attack.color;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, radius * 1.45, radius * 0.72, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#fff7";
-          ctx.beginPath();
-          ctx.ellipse(radius * 0.25, -radius * 0.18, radius * 0.55, radius * 0.22, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = attack.color + "88";
-          ctx.beginPath();
-          ctx.moveTo(-radius * 1.2, 0);
-          ctx.lineTo(-radius * 2.8, -radius * 0.7);
-          ctx.lineTo(-radius * 2.4, radius * 0.65);
-          ctx.closePath();
-          ctx.fill();
+          const projectile = images[attack.assetKey];
+          if (projectile && projectile.complete && projectile.naturalWidth > 0) {
+            ctx.drawImage(projectile, -radius * 2.5, -radius * 1.25, radius * 5, radius * 2.5);
+          } else {
+            ctx.fillStyle = attack.color;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, radius * 1.45, radius * 0.72, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#fff7";
+            ctx.beginPath();
+            ctx.ellipse(radius * 0.25, -radius * 0.18, radius * 0.55, radius * 0.22, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
           ctx.restore();
         }
 
@@ -910,15 +1346,23 @@
             drawDragonSelect();
             return;
           }
+          if (state.phase === "upgrade") {
+            drawUpgradeScreen();
+            return;
+          }
 
           ctx.save();
           if (state.shake > 0) ctx.translate(rand(-6, 6), rand(-5, 5));
 
           drawArena();
           const renderData = core.getBattleRenderData(cfg, state);
+          const enemyStats = core.getEnemyStats(cfg, state);
+          const playerMaxHp = core.getPlayerMaxHp(cfg, state);
           const layout = cfg.battleLayout;
-          drawDragonImage(renderData.enemy.assetKey, layout.enemyDragon.x, layout.enemyDragon.y, layout.enemyDragon.w, layout.enemyDragon.h, renderData.enemy.flip);
+          drawEnemyTierAura(layout.enemyDragon, enemyStats);
+          drawDragonImage(renderData.enemy.assetKey, layout.enemyDragon.x, layout.enemyDragon.y, layout.enemyDragon.w * enemyStats.scale, layout.enemyDragon.h * enemyStats.scale, renderData.enemy.flip);
           drawDragonImage(renderData.player.assetKey, layout.playerDragon.x, layout.playerDragon.y, layout.playerDragon.w, layout.playerDragon.h, renderData.player.flip);
+          drawGuardEffect(layout.playerDragon);
           state.pendingAttacks.forEach(drawPendingAttack);
 
           state.particles.forEach((p) => {
@@ -930,8 +1374,9 @@
             ctx.globalAlpha = 1;
           });
 
-          drawStatusPanel(layout.playerHud, `P1 ${renderData.player.name}`, renderData.player.role, state.playerHp, "#34d399", state.selectedDragonId);
-          drawStatusPanel(layout.enemyHud, "P2 Enemy Dragon", "AI Rival", state.enemyHp, "#ef4444", "enemy");
+          const upgradeRanks = Object.values(state.upgrades).reduce((sum, rank) => sum + rank, 0);
+          drawStatusPanel(layout.playerHud, `P1 ${renderData.player.name}`, `${renderData.player.role} • Upgrades ${upgradeRanks}`, state.playerHp, playerMaxHp, "#34d399", state.selectedDragonId);
+          drawStatusPanel(layout.enemyHud, `P2 ${renderData.enemy.name}`, `${renderData.enemy.role} • DMG ${enemyStats.damage}`, state.enemyHp, enemyStats.maxHp, enemyStats.color, renderData.enemy.elementKey);
           drawPanelCooldowns(layout.playerHud, "player");
           drawPanelCooldowns(layout.enemyHud, "enemy");
 
@@ -939,7 +1384,7 @@
           ctx.textAlign = "center";
           ctx.fillStyle = "#f6c453";
           ctx.font = "bold 17px system-ui";
-          ctx.fillText("TIME", layout.timer.x + layout.timer.w / 2, layout.timer.y + 27);
+          ctx.fillText(`STAGE ${state.stage}`, layout.timer.x + layout.timer.w / 2, layout.timer.y + 27);
           ctx.font = "bold 32px system-ui";
           ctx.fillText(String(Math.ceil(state.time)), layout.timer.x + layout.timer.w / 2, layout.timer.y + 62);
           ctx.textAlign = "left";
@@ -947,9 +1392,9 @@
           drawStateLabel(state.enemyState, layout.enemyDragon.x, layout.enemyDragon.labelY);
           drawStateLabel(state.playerState, layout.playerDragon.x, layout.playerDragon.labelY);
 
-          ctx.fillStyle = listening ? "#34d399" : "#fca5a5";
+          ctx.fillStyle = listening ? "#34d399" : micRequested ? "#f6c453" : "#fca5a5";
           ctx.font = "bold 16px system-ui";
-          ctx.fillText(listening ? "Mic listening" : "Mic off", layout.mic.x, layout.mic.y);
+          ctx.fillText(listening ? "Mic listening" : micRequested ? "Mic reconnecting" : "Mic off", layout.mic.x, layout.mic.y);
 
           rr(layout.message.x, layout.message.y, layout.message.w, layout.message.h, 18, "#07101dd9", "#f6c45366");
           ctx.textAlign = "center";
@@ -959,7 +1404,7 @@
           ctx.textAlign = "left";
 
           drawCommandPanel(layout.playerCommand, "P1 COMMAND", state.accepted, "left");
-          drawCommandPanel(layout.commandReference, "COMMANDS", "Attack | Defence | Block | Ultimate");
+          drawCommandPanel(layout.commandReference, "COMMANDS", "Attack | Defence | Block | Ultimate/Skill");
           drawCommandPanel(layout.enemyCommand, "P2 / AI COMMAND", state.enemyAccepted, "right");
 
           if (state.phase === "ended") {
@@ -972,7 +1417,7 @@
             ctx.fillText(state.result, 550, 250);
             ctx.fillStyle = "#cbd5e1";
             ctx.font = "20px system-ui";
-            ctx.fillText("Say: Attack, Defence, Block, Ultimate", 550, 305);
+            ctx.fillText("Say: Attack, Defence, Block, Ultimate, or Skill", 550, 305);
             ctx.fillText("Or use canvas buttons / keys A, D, B, U", 550, 340);
             ctx.fillStyle = "#f6c453";
             ctx.font = "bold 21px system-ui";
@@ -1003,35 +1448,62 @@
           recognition.lang = "en-US";
           recognition.continuous = true;
           recognition.interimResults = true;
-          recognition.maxAlternatives = 1;
+          recognition.maxAlternatives = 3;
 
           recognition.onstart = () => {
             listening = true;
-            state.note = "Listening. Say Attack / Defence / Block / Ultimate.";
+            speechError = "";
+            state.note = "Listening. Say Attack / Defence / Block / Ultimate or Skill.";
             log("mic_start");
           };
 
           recognition.onend = () => {
             listening = false;
-            state.note = "Mic is off. Press Start Mic to listen again.";
+            if (micRequested) {
+              state.note = speechError || "Reconnecting microphone...";
+              clearTimeout(recognitionRestartTimer);
+              recognitionRestartTimer = setTimeout(startRecognition, 250);
+            } else if (!speechError) {
+              state.note = "Mic is off. Press Start Mic to listen again.";
+            }
             log("mic_end");
           };
 
           recognition.onerror = (e) => {
-            state.note = `Mic error: ${e.error}. Use canvas buttons or A/D/B/U.`;
+            const fatal = ["not-allowed", "service-not-allowed", "audio-capture"].includes(e.error);
+            if (fatal) micRequested = false;
+            speechError = e.error === "no-speech"
+              ? "No speech heard. Microphone will keep listening."
+              : e.error === "aborted" && !micRequested
+                ? "Mic is off. Press Start Mic to listen again."
+                : `Mic error: ${e.error}. Use canvas buttons or A/D/B/U.`;
+            state.note = speechError;
             log("mic_error", { error: e.error });
           };
 
           recognition.onresult = (e) => {
+            if (!micRequested) return;
+
             for (let i = e.resultIndex; i < e.results.length; i += 1) {
-              const text = e.results[i][0].transcript;
-              state.lastHeard = normalize(text) || "-";
+              const alternatives = Array.from(e.results[i]).map((alternative) => ({
+                text: alternative.transcript,
+                normalized: normalize(alternative.transcript),
+                confidence: alternative.confidence,
+                cmd: commandFromSpeech(alternative.transcript)
+              }));
+              const best = alternatives.find((alternative) => alternative.cmd) || alternatives[0];
+              state.lastHeard = best?.normalized || "-";
 
               if (e.results[i].isFinal) {
-                const cmd = commandFromSpeech(text);
-                log("speech_final", { text, cmd });
-                if (cmd) useCommand(cmd, "voice");
-                else state.message = "Not recognized. Say Attack, Defence, Block, or Ultimate.";
+                const now = performance.now();
+                const signature = `${best?.cmd || "unknown"}:${best?.normalized || ""}`;
+                const duplicate = signature === lastVoiceCommand.signature && now - lastVoiceCommand.at < 650;
+                log("speech_final", { alternatives, cmd: best?.cmd || null, duplicate });
+
+                if (duplicate) continue;
+                lastVoiceCommand = { signature, at: now };
+                if (best?.cmd) useCommand(best.cmd, "voice");
+                else state.message = "Not recognized. Say Attack, Defence, Block, Ultimate, or Skill.";
               }
             }
           };
@@ -1048,6 +1520,14 @@
           const button = buttons.find((item) => x >= item.x && x <= item.x + item.w && y >= item.y && y <= item.y + item.h);
 
           if (!button) return;
+          if (button.id.startsWith("upgrade:")) {
+            applyUpgrade(button.id.slice("upgrade:".length));
+            return;
+          }
+          if (button.id === "continueMax") {
+            continueWithMaxUpgrades();
+            return;
+          }
           if (button.id.startsWith("select:")) {
             state.selectedDragonId = button.id.slice("select:".length);
             const dragon = core.getSelectedDragon(cfg, state);
@@ -1067,11 +1547,19 @@
         window.addEventListener("keydown", (e) => {
           const k = e.key.toLowerCase();
           if (state.phase === "select" && k === "enter") confirmDragon();
+          if (state.phase === "upgrade" && ["1", "2", "3", "4"].includes(k)) {
+            applyUpgrade(Object.keys(cfg.progression.upgrades)[Number(k) - 1]);
+            return;
+          }
+          if (state.phase === "upgrade" && k === "enter") {
+            continueWithMaxUpgrades();
+            return;
+          }
           if (k === "a") useCommand("attack", "keyboard");
           if (k === "d") useCommand("defence", "keyboard");
           if (k === "b") useCommand("block", "keyboard");
           if (k === "u") useCommand("ultimate", "keyboard");
-          if (k === "r") reset();
+          if (k === "r" && state.phase === "playing") reset();
         });
 
         setupSpeech();
