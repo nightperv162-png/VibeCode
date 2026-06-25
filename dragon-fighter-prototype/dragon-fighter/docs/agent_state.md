@@ -68,6 +68,10 @@ Post-Milestone 3 - Current documentation alignment.
 - Voice/manual combat commands are ignored while paused; pause menu navigation remains active.
 - Expanded tests to 17 cases covering pause controls, freeze behavior, command blocking, resume, retry, and Main Menu reset.
 - Verified `node --test tests/game-flow.test.js`, `git diff --check`, and `http://127.0.0.1:5174/index.html` HTTP 200.
+- Reassigned combat keyboard shortcuts to Q/W/E/R for Attack, Defence, Block, and Skill/Ultimate.
+- Updated tutorial, HUD, and microphone fallback/error text to show Q/W/E/R.
+- Removed old A/D/B/U combat key behavior and expanded tests to 19 cases covering new keys, old key rejection, mic lockout, and pause lockout.
+- Verified `node --test tests/game-flow.test.js` and `git diff --check` pass.
 
 ## Next Action
 

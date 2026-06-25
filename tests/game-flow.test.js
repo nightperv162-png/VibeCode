@@ -74,6 +74,10 @@ function startBattle(app, dragonId = "ember") {
   app.confirmDragon();
 }
 
+function pressKey(app, key) {
+  app.__test.keyHandlers[0]({ key });
+}
+
 test("game starts at Main Menu and tutorial can be opened before Play Now", () => {
   const app = loadGame();
   assert.equal(app.state.phase, app.CONFIG.flow.initialPhase);
@@ -231,7 +235,7 @@ test("manual command buttons and combat keys are disabled while mic is active", 
   app.useCommand("attack", "canvas");
   assert.equal(app.state.accepted, "-");
 
-  app.__test.keyHandlers[0]({ key: "a" });
+  pressKey(app, "q");
   assert.equal(app.state.accepted, "-");
 
   app.state.cd.attack = 0;
@@ -250,8 +254,53 @@ test("buttons and combat keys work again after mic is stopped", () => {
   const attackButton = app.getButtons().find((button) => button.id === "attack");
   assert.equal(attackButton.disabled, false);
   app.state.cd.attack = 0;
-  app.__test.keyHandlers[0]({ key: "a" });
+  pressKey(app, "q");
   assert.equal(app.state.accepted, "ATTACK");
+});
+
+test("Q W E R trigger Attack Defence Block and Skill", () => {
+  const app = loadGame();
+  startBattle(app);
+
+  pressKey(app, "q");
+  assert.equal(app.state.accepted, "ATTACK");
+
+  app.state.cd.defence = 0;
+  pressKey(app, "w");
+  assert.equal(app.state.accepted, "DEFENCE");
+
+  app.state.cd.block = 0;
+  pressKey(app, "e");
+  assert.equal(app.state.accepted, "BLOCK");
+
+  app.state.cd.ultimate = 0;
+  pressKey(app, "r");
+  assert.equal(app.state.accepted, "ULTIMATE");
+
+  assert.equal(app.commandFromKey("q"), "attack");
+  assert.equal(app.commandFromKey("w"), "defence");
+  assert.equal(app.commandFromKey("e"), "block");
+  assert.equal(app.commandFromKey("r"), "ultimate");
+});
+
+test("old combat keys no longer trigger skills", () => {
+  const app = loadGame();
+  startBattle(app);
+  app.state.cd.attack = 0;
+  app.state.cd.defence = 0;
+  app.state.cd.block = 0;
+  app.state.cd.ultimate = 0;
+
+  ["a", "d", "b", "u"].forEach((key) => pressKey(app, key));
+
+  assert.equal(app.state.accepted, "-");
+  assert.equal(app.state.pendingAttacks.length, 0);
+  assert.equal(app.state.defenceTimer, 0);
+  assert.equal(app.state.blockTimer, 0);
+  assert.equal(app.commandFromKey("a"), null);
+  assert.equal(app.commandFromKey("d"), null);
+  assert.equal(app.commandFromKey("b"), null);
+  assert.equal(app.commandFromKey("u"), null);
 });
 
 test("Pause button replaces Restart in combat controls", () => {
@@ -301,7 +350,7 @@ test("voice and manual combat commands do nothing while paused", () => {
   assert.equal(app.manualCombatInputDisabled(), true);
   assert.equal(app.processRecognizedCommand("attack", "paused:attack", 1000), false);
   app.useCommand("attack", "canvas");
-  app.__test.keyHandlers[0]({ key: "a" });
+  pressKey(app, "q");
 
   assert.equal(app.state.accepted, "-");
   assert.equal(app.state.pendingAttacks.length, 0);

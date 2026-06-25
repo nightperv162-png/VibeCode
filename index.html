@@ -66,6 +66,12 @@
             scanIntervalSeconds: 0.5,
             duplicateWindowMs: 650
           },
+          combatKeys: {
+            attack: "q",
+            defence: "w",
+            block: "e",
+            ultimate: "r"
+          },
           flow: {
             initialPhase: "menu",
             labels: {
@@ -102,7 +108,7 @@
                 },
                 {
                   title: "Fight With Four Commands",
-                  body: "Use Attack, Defence, Block, and Ultimate. Speak one full command word, press A/D/B/U, or tap a command button."
+                  body: "Use Attack, Defence, Block, and Ultimate. Speak one full command word, press Q/W/E/R, or tap a command button."
                 },
                 {
                   title: "Watch Cooldowns",
@@ -774,6 +780,15 @@
           return commandFromWord(words[0]);
         }
 
+        function commandFromKey(key) {
+          const normalizedKey = String(key || "").toLowerCase();
+          return Object.entries(cfg.combatKeys).find(([, mappedKey]) => mappedKey === normalizedKey)?.[0] || null;
+        }
+
+        function combatKeyHintText() {
+          return `Q Attack | W Defence | E Block | R Skill`;
+        }
+
         function clearVoiceCommandQueue() {
           voiceCommandQueue.length = 0;
         }
@@ -973,7 +988,7 @@
 
         function toggleMic() {
           if (!recognition) {
-            state.note = "This browser does not support Web Speech API. Use canvas buttons or A/D/B/U/R.";
+            state.note = "This browser does not support Web Speech API. Use canvas buttons or Q/W/E/R.";
             return;
           }
 
@@ -1872,7 +1887,7 @@
           ctx.textAlign = "left";
 
           drawCommandPanel(layout.playerCommand, "P1 COMMAND", state.accepted, "left");
-          drawCommandPanel(layout.commandReference, "COMMANDS - ONE FULL WORD", "Attack | Defence | Block | Ultimate/Skill");
+          drawCommandPanel(layout.commandReference, "COMMANDS - ONE FULL WORD", combatKeyHintText());
           drawCommandPanel(layout.enemyCommand, "P2 / AI COMMAND", state.enemyAccepted, "right");
 
           if (state.phase === "result") drawResultOverlay();
@@ -1893,7 +1908,7 @@
 
         function setupSpeech() {
           if (!SpeechRecognition) {
-            if (state.phase !== "tutorial") state.note = "This browser does not support Web Speech API. Use canvas buttons or A/D/B/U/R.";
+            if (state.phase !== "tutorial") state.note = "This browser does not support Web Speech API. Use canvas buttons or Q/W/E/R.";
             return;
           }
 
@@ -1933,7 +1948,7 @@
               ? "No speech heard. Microphone will keep listening."
               : e.error === "aborted" && !micRequested
                 ? "Mic is off. Press Start Mic to listen again."
-                : `Mic error: ${e.error}. Use canvas buttons or A/D/B/U.`;
+                : `Mic error: ${e.error}. Use canvas buttons or Q/W/E/R.`;
             state.note = speechError;
             log("mic_error", { error: e.error });
           };
@@ -2099,10 +2114,8 @@
             pauseMatch();
             return;
           }
-          if (!manualCombatInputDisabled() && k === "a") useCommand("attack", "keyboard");
-          if (!manualCombatInputDisabled() && k === "d") useCommand("defence", "keyboard");
-          if (!manualCombatInputDisabled() && k === "b") useCommand("block", "keyboard");
-          if (!manualCombatInputDisabled() && k === "u") useCommand("ultimate", "keyboard");
+          const command = commandFromKey(k);
+          if (command && !manualCombatInputDisabled()) useCommand(command, "keyboard");
         });
 
         window.DragonFighter = {
@@ -2127,6 +2140,7 @@
           useCommand,
           processRecognizedCommand,
           commandFromSpeech,
+          commandFromKey,
           manualCombatInputDisabled,
           getRecognition: () => recognition,
           getButtons: () => buttons.slice(),

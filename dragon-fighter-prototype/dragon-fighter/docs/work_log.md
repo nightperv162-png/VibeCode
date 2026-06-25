@@ -134,3 +134,12 @@
 - `node --test tests/game-flow.test.js` passed: 17 tests, 17 pass.
 - `git diff --check` passed.
 - Local static server check returned HTTP 200 at `http://127.0.0.1:5174/index.html`.
+
+### Combat Shortcut Remap
+
+- Reassigned combat keyboard shortcuts in root `index.html` to Q/W/E/R for Attack, Defence, Block, and Skill/Ultimate.
+- Added config-driven key lookup and updated tutorial, HUD, and microphone fallback/error hints.
+- Removed old A/D/B/U combat behavior from the input path while leaving navigation hotkeys unchanged.
+- Expanded `tests/game-flow.test.js` to 19 tests covering new keys, old key rejection, mic-active key disabling, and paused key disabling.
+- `node --test tests/game-flow.test.js` passed: 19 tests, 19 pass.
+- `git diff --check` passed.
