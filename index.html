@@ -98,9 +98,10 @@
               bodyX: 700,
               bodyY: 256,
               lineHeight: 28,
-              skipButton: { x: 478, y: 420, w: 135, h: 48 },
-              nextButton: { x: 633, y: 420, w: 135, h: 48 },
-              doneButton: { x: 788, y: 420, w: 135, h: 48 },
+              skipButton: { x: 400, y: 420, w: 135, h: 48 },
+              backButton: { x: 555, y: 420, w: 135, h: 48 },
+              nextButton: { x: 710, y: 420, w: 135, h: 48 },
+              doneButton: { x: 710, y: 420, w: 135, h: 48 },
               steps: [
                 {
                   title: "Choose A Dragon",
@@ -131,6 +132,11 @@
               resumeButton: { x: 565, y: 245, w: 270, h: 52 },
               retryButton: { x: 565, y: 315, w: 270, h: 52 },
               menuButton: { x: 565, y: 385, w: 270, h: 52 }
+            },
+            confirmChangeDragon: {
+              panel: { x: 450, y: 200, w: 500, h: 230 },
+              noButton: { x: 500, y: 345, w: 175, h: 48 },
+              yesButton: { x: 725, y: 345, w: 175, h: 48 }
             }
           },
           combatStart: {
@@ -242,9 +248,13 @@
             cardH: 330,
             cardGap: 30,
             firstCardX: 205,
-            imageY: 252,
+            nameY: 178,
+            imageY: 268,
             imageW: 195,
             imageH: 140,
+            roleY: 365,
+            flavorY: 395,
+            statsY: 455,
             confirm: { x: 565, y: 510, w: 270, h: 48 }
           },
           upgradeLayout: {
@@ -329,6 +339,7 @@
             message: initialPhase === "tutorial" ? "Welcome to Dragon Fighter." : config.flow.labels.title,
             note: initialPhase === "tutorial" ? "Next explains the basics." : config.flow.labels.subtitle,
             result: "",
+            confirmChangeDragon: false,
             paused: false,
             pauseStartedAt: 0,
             pauseRenderNow: 0,
@@ -667,6 +678,14 @@
           log("tutorial_next", { step: state.tutorialStep });
         }
 
+        function previousTutorialStep() {
+          if (state.phase !== "tutorial" || state.tutorialStep <= 0) return;
+          state.tutorialStep -= 1;
+          state.message = cfg.flow.tutorial.steps[state.tutorialStep].title;
+          state.note = "Back returns to the previous tip.";
+          log("tutorial_back", { step: state.tutorialStep });
+        }
+
         function backToMainMenu() {
           micRequested = false;
           clearTimeout(recognitionRestartTimer);
@@ -717,6 +736,7 @@
 
         function chooseDragonAgain() {
           clearVoiceCommandQueue();
+          state.confirmChangeDragon = false;
           state.phase = "select";
           state.selectedDragonId = null;
           state.stage = 1;
@@ -749,6 +769,26 @@
           state.particles = [];
           state.pendingAttacks = [];
           log("choose_dragon_again");
+        }
+
+        function requestChangeDragonConfirmation() {
+          if (state.phase !== "upgrade") return;
+          state.confirmChangeDragon = true;
+          state.note = "Confirm before changing dragon.";
+          log("change_dragon_confirm_open");
+        }
+
+        function cancelChangeDragonConfirmation() {
+          if (!state.confirmChangeDragon) return;
+          state.confirmChangeDragon = false;
+          state.note = "Choose one upgrade for your dragon.";
+          log("change_dragon_confirm_cancel");
+        }
+
+        function confirmChangeDragon() {
+          if (!state.confirmChangeDragon) return;
+          log("change_dragon_confirm_yes");
+          chooseDragonAgain();
         }
 
         function normalize(text) {
@@ -1217,9 +1257,17 @@
             buttons.length = 0;
             const tutorial = cfg.flow.tutorial;
             const lastStep = state.tutorialStep >= tutorial.steps.length - 1;
-            canvasButton("tutorialSkip", tutorial.skipButton.x, tutorial.skipButton.y, tutorial.skipButton.w, tutorial.skipButton.h, "Skip", "#102a4cdd", "#87d5ff");
-            canvasButton("tutorialNext", tutorial.nextButton.x, tutorial.nextButton.y, tutorial.nextButton.w, tutorial.nextButton.h, lastStep ? "Done" : "Next", "#f6c453dd", "#fff4d6");
-            canvasButton("tutorialDone", tutorial.doneButton.x, tutorial.doneButton.y, tutorial.doneButton.w, tutorial.doneButton.h, "Done", "#164e35dd", "#34d399");
+            if (!lastStep) {
+              canvasButton("tutorialSkip", tutorial.skipButton.x, tutorial.skipButton.y, tutorial.skipButton.w, tutorial.skipButton.h, "Skip", "#102a4cdd", "#87d5ff");
+            }
+            if (state.tutorialStep > 0) {
+              canvasButton("tutorialBack", tutorial.backButton.x, tutorial.backButton.y, tutorial.backButton.w, tutorial.backButton.h, "Back", "#102a4cdd", "#87d5ff");
+            }
+            if (lastStep) {
+              canvasButton("tutorialDone", tutorial.doneButton.x, tutorial.doneButton.y, tutorial.doneButton.w, tutorial.doneButton.h, "Done", "#164e35dd", "#34d399");
+            } else {
+              canvasButton("tutorialNext", tutorial.nextButton.x, tutorial.nextButton.y, tutorial.nextButton.w, tutorial.nextButton.h, "Next", "#f6c453dd", "#fff4d6");
+            }
             return;
           }
 
@@ -1318,9 +1366,6 @@
           ctx.fillStyle = "#cbd5e1";
           ctx.font = "20px system-ui";
           wrapText(step.body, tutorial.bodyX, tutorial.bodyY, tutorial.panel.w - 115, tutorial.lineHeight);
-          ctx.fillStyle = "#94a3b8";
-          ctx.font = "15px system-ui";
-          ctx.fillText("Next, Skip, and Done are drawn inside the Canvas.", cfg.viewport.centerX, 365);
           drawControls();
           ctx.textAlign = "left";
         }
@@ -1345,19 +1390,19 @@
             const selected = state.selectedDragonId === dragon.id;
             buttons.push({ id: `select:${dragon.id}`, x, y: select.cardY, w: select.cardW, h: select.cardH });
             rr(x, select.cardY, select.cardW, select.cardH, 20, selected ? "#1f2937f2" : "#0f172adf", selected ? "#f6c453" : "#ffffff33");
-            drawDragonImage(dragon.id, x + select.cardW / 2, select.imageY, select.imageW, select.imageH, cfg.facing.player.flip);
             ctx.fillStyle = "#fff4d6";
             ctx.font = "bold 25px system-ui";
-            ctx.fillText(dragon.name, x + select.cardW / 2, select.cardY + 165);
+            ctx.fillText(dragon.name, x + select.cardW / 2, select.nameY);
+            drawDragonImage(dragon.id, x + select.cardW / 2, select.imageY, select.imageW, select.imageH, cfg.facing.player.flip);
             ctx.fillStyle = selected ? "#f6c453" : "#93c5fd";
             ctx.font = "bold 17px system-ui";
-            ctx.fillText(dragon.role, x + select.cardW / 2, select.cardY + 193);
+            ctx.fillText(dragon.role, x + select.cardW / 2, select.roleY);
             ctx.fillStyle = "#cbd5e1";
             ctx.font = "14px system-ui";
-            wrapText(dragon.flavor, x + select.cardW / 2, select.cardY + 224, select.cardW - 46, 18);
+            wrapText(dragon.flavor, x + select.cardW / 2, select.flavorY, select.cardW - 46, 18);
             ctx.fillStyle = "#bbf7d0";
             ctx.font = "bold 13px system-ui";
-            ctx.fillText(`ATK x${dragon.modifiers.attackDamage}  DEF x${dragon.modifiers.defenceDuration}  SKILL x${dragon.modifiers.skillCooldown}`, x + select.cardW / 2, select.cardY + 300);
+            ctx.fillText(`ATK x${dragon.modifiers.attackDamage}  DEF x${dragon.modifiers.defenceDuration}  SKILL x${dragon.modifiers.skillCooldown}`, x + select.cardW / 2, select.statsY);
           });
 
           const selectedDragon = core.getSelectedDragon(cfg, state);
@@ -1428,6 +1473,10 @@
           ctx.font = "14px system-ui";
           ctx.fillText("Keys 1–4 choose an upgrade", cfg.viewport.centerX, cfg.viewport.height - 13);
           ctx.textAlign = "left";
+          if (state.confirmChangeDragon) {
+            buttons.length = 0;
+            drawChangeDragonConfirmOverlay();
+          }
         }
 
         function drawResultOverlay() {
@@ -1458,6 +1507,25 @@
           ctx.fillStyle = "#cbd5e1";
           ctx.font = "17px system-ui";
           ctx.fillText("Combat is frozen until you resume or choose another route.", cfg.viewport.centerX, panel.y + 108);
+          ctx.textAlign = "left";
+        }
+
+        function drawChangeDragonConfirmOverlay() {
+          const confirm = cfg.flow.confirmChangeDragon;
+          const panel = confirm.panel;
+          ctx.fillStyle = "#020617a8";
+          ctx.fillRect(0, 0, cfg.viewport.width, cfg.viewport.height);
+          rr(panel.x, panel.y, panel.w, panel.h, 24, "#0f172af2", "#f6c453dd");
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#f6c453";
+          ctx.font = "bold 30px system-ui";
+          ctx.fillText("Change Dragon?", cfg.viewport.centerX, panel.y + 62);
+          ctx.fillStyle = "#cbd5e1";
+          ctx.font = "17px system-ui";
+          ctx.fillText("Your current upgrade choice screen will close.", cfg.viewport.centerX, panel.y + 104);
+          ctx.fillText("Choose No to stay here, or Yes to continue.", cfg.viewport.centerX, panel.y + 132);
+          canvasButton("cancelChangeDragon", confirm.noButton.x, confirm.noButton.y, confirm.noButton.w, confirm.noButton.h, "No", "#102a4cdd", "#87d5ff");
+          canvasButton("confirmChangeDragon", confirm.yesButton.x, confirm.yesButton.y, confirm.yesButton.w, confirm.yesButton.h, "Yes", "#713f12dd", "#f6c453");
           ctx.textAlign = "left";
         }
 
@@ -2020,6 +2088,10 @@
             nextTutorialStep();
             return;
           }
+          if (button.id === "tutorialBack") {
+            previousTutorialStep();
+            return;
+          }
           if (button.id === "tutorialSkip" || button.id === "tutorialDone") {
             completeTutorial();
             return;
@@ -2052,6 +2124,14 @@
             backToMainMenu();
             return;
           }
+          if (button.id === "cancelChangeDragon") {
+            cancelChangeDragonConfirmation();
+            return;
+          }
+          if (button.id === "confirmChangeDragon") {
+            confirmChangeDragon();
+            return;
+          }
           if (button.id === "continueAfterWin") {
             continueAfterWin();
             return;
@@ -2076,7 +2156,7 @@
           if (button.id === "defence") useCommand("defence", "canvas");
           if (button.id === "block") useCommand("block", "canvas");
           if (button.id === "ultimate") useCommand("ultimate", "canvas");
-          if (button.id === "chooseDragonAgain") chooseDragonAgain();
+          if (button.id === "chooseDragonAgain") requestChangeDragonConfirmation();
         });
 
         window.addEventListener("keydown", (e) => {
@@ -2125,11 +2205,15 @@
           playNow,
           openTutorial,
           nextTutorialStep,
+          previousTutorialStep,
           completeTutorial,
           confirmDragon,
           pauseMatch,
           resumeMatch,
           retryPausedMatch,
+          requestChangeDragonConfirmation,
+          cancelChangeDragonConfirmation,
+          confirmChangeDragon,
           finish,
           continueAfterWin,
           retryLastBattle,

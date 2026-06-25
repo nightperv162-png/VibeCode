@@ -89,11 +89,44 @@ test("game starts at Main Menu and tutorial can be opened before Play Now", () =
   assert.equal(app.state.tutorialStep, 0);
   app.nextTutorialStep();
   assert.equal(app.state.tutorialStep, 1);
+  app.previousTutorialStep();
+  assert.equal(app.state.tutorialStep, 0);
   app.completeTutorial();
   assert.equal(app.state.phase, "menu");
 
   app.playNow();
   assert.equal(app.state.phase, "select");
+});
+
+test("tutorial buttons show Back after first step and Done instead of Next on final step", () => {
+  const app = loadGame();
+  app.openTutorial();
+  app.draw();
+  let ids = app.getButtons().map((button) => button.id);
+  assert.ok(ids.includes("tutorialSkip"));
+  assert.ok(ids.includes("tutorialNext"));
+  assert.ok(!ids.includes("tutorialBack"));
+  assert.ok(!ids.includes("tutorialDone"));
+
+  app.nextTutorialStep();
+  app.draw();
+  ids = app.getButtons().map((button) => button.id);
+  assert.ok(ids.includes("tutorialBack"));
+  assert.ok(ids.includes("tutorialNext"));
+
+  app.nextTutorialStep();
+  app.nextTutorialStep();
+  app.draw();
+  ids = app.getButtons().map((button) => button.id);
+  assert.ok(ids.includes("tutorialBack"));
+  assert.ok(ids.includes("tutorialDone"));
+  assert.ok(!ids.includes("tutorialSkip"));
+  assert.ok(!ids.includes("tutorialNext"));
+  const doneButton = app.getButtons().find((button) => button.id === "tutorialDone");
+  assert.equal(doneButton.x, app.CONFIG.flow.tutorial.doneButton.x);
+  assert.equal(doneButton.y, app.CONFIG.flow.tutorial.doneButton.y);
+  assert.equal(doneButton.w, app.CONFIG.flow.tutorial.doneButton.w);
+  assert.equal(doneButton.h, app.CONFIG.flow.tutorial.doneButton.h);
 });
 
 test("loss exposes only Retry Match and Back to Main Menu", () => {
@@ -418,4 +451,37 @@ test("Pause Back to Main Menu resets progress and returns correctly", () => {
   assert.equal(app.state.victories, 0);
   assert.equal(app.state.upgrades.guard, 0);
   assert.equal(app.state.pendingAttacks.length, 0);
+});
+
+test("Change Dragon asks for confirmation before leaving upgrade screen", () => {
+  const app = loadGame();
+  startBattle(app, "tide");
+  app.state.upgrades.power = 2;
+  app.finish("YOU WIN");
+  app.continueAfterWin();
+  app.draw();
+  assert.equal(app.state.phase, "upgrade");
+  assert.ok(app.getButtons().some((button) => button.id === "chooseDragonAgain"));
+
+  app.requestChangeDragonConfirmation();
+  app.draw();
+  assert.equal(app.state.confirmChangeDragon, true);
+  assert.equal(app.state.phase, "upgrade");
+  let ids = app.getButtons().map((button) => button.id);
+  assert.equal(ids.length, 2);
+  assert.equal(ids[0], "cancelChangeDragon");
+  assert.equal(ids[1], "confirmChangeDragon");
+
+  app.cancelChangeDragonConfirmation();
+  assert.equal(app.state.confirmChangeDragon, false);
+  assert.equal(app.state.phase, "upgrade");
+  assert.equal(app.state.selectedDragonId, "tide");
+  assert.equal(app.state.upgrades.power, 2);
+
+  app.requestChangeDragonConfirmation();
+  app.confirmChangeDragon();
+  assert.equal(app.state.phase, "select");
+  assert.equal(app.state.confirmChangeDragon, false);
+  assert.equal(app.state.selectedDragonId, null);
+  assert.equal(app.state.upgrades.power, 0);
 });

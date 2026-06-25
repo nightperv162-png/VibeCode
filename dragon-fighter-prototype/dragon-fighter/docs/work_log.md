@@ -143,3 +143,29 @@
 - Expanded `tests/game-flow.test.js` to 19 tests covering new keys, old key rejection, mic-active key disabling, and paused key disabling.
 - `node --test tests/game-flow.test.js` passed: 19 tests, 19 pass.
 - `git diff --check` passed.
+
+### Tutorial Navigation Polish
+
+- Removed the extra explanatory text line from the Canvas tutorial.
+- Added a Back button on tutorial pages 2/4, 3/4, and 4/4.
+- Removed Next from page 4/4 and then updated the final page to also hide Skip and use a green Done button.
+- Expanded tutorial button tests in `tests/game-flow.test.js`.
+- `node --test tests/game-flow.test.js` passed: 20 tests, 20 pass.
+- `git diff --check` passed.
+
+### Dragon Select Layout
+
+- Moved each dragon name above its image on the Choose Your Dragon cards.
+- Added Dragon Select text position values to config and reused them in rendering.
+- Lowered the role, description, and stats text to avoid overlapping the dragon images.
+- `node --test tests/game-flow.test.js` passed: 20 tests, 20 pass.
+- `git diff --check` passed.
+
+### Change Dragon Confirmation
+
+- Added a Canvas warning dialog when pressing Change Dragon on the upgrade screen.
+- No closes the dialog and keeps the player on the current upgrade screen.
+- Yes proceeds with the existing Change Dragon flow.
+- Added test coverage for the confirmation flow.
+- `node --test tests/game-flow.test.js` passed: 21 tests, 21 pass.
+- `git diff --check` passed.

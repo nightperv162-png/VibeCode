@@ -72,6 +72,15 @@ Post-Milestone 3 - Current documentation alignment.
 - Updated tutorial, HUD, and microphone fallback/error text to show Q/W/E/R.
 - Removed old A/D/B/U combat key behavior and expanded tests to 19 cases covering new keys, old key rejection, mic lockout, and pause lockout.
 - Verified `node --test tests/game-flow.test.js` and `git diff --check` pass.
+- Removed the extra explanatory text line from the Canvas tutorial.
+- Added a Back button on tutorial steps 2/4, 3/4, and 4/4.
+- Removed Next from tutorial step 4/4.
+- Expanded tutorial tests; 20 Node tests now pass.
+- Updated tutorial step 4/4 to remove Skip, keep Back, and use a green Done button.
+- Moved dragon names above their images on the Choose Your Dragon cards.
+- Lowered dragon role, description, and stats text on Choose Your Dragon cards to avoid image overlap.
+- Added a Canvas confirmation warning for Change Dragon on the upgrade screen; No stays on the current screen and Yes proceeds to dragon select.
+- Expanded tests to 21 cases covering the Change Dragon confirmation flow.
 
 ## Next Action
 
