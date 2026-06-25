@@ -58,7 +58,17 @@ Post-Milestone 3 - Current documentation alignment.
 - Disabled manual combat command buttons and A/D/B/U shortcuts while the mic is active; voice commands, mic, navigation, and restart remain usable.
 - Expanded `tests/game-flow.test.js` to cover tutorial flow, voice config, immediate voice casting, cooldown rejection, duplicate voice suppression, mic/manual lockout, and manual controls re-enabling.
 - Verified 11 Node tests pass and `git diff --check` passes.
+- Centered the Canvas tutorial Skip, Next, and Done button row within the tutorial panel.
+- Re-ran 11 Node tests and `git diff --check` successfully after the layout tweak.
+- Set Main Menu as the first screen again, added a Main Menu Tutorial button, and lowered the tutorial header/body text.
+- Updated the flow test to expect Main Menu first with tutorial opened from the menu; 11 Node tests still pass.
+- Replaced the combat Restart button with a Pause button and Canvas pause menu.
+- Added pause state/config, Resume, paused Retry Match, and Back to Main Menu handling.
+- Pause now freezes match timer, AI, cooldowns, effects, pending projectiles, render-time animations, and Frenzy timer state.
+- Voice/manual combat commands are ignored while paused; pause menu navigation remains active.
+- Expanded tests to 17 cases covering pause controls, freeze behavior, command blocking, resume, retry, and Main Menu reset.
+- Verified `node --test tests/game-flow.test.js`, `git diff --check`, and `http://127.0.0.1:5174/index.html` HTTP 200.
 
 ## Next Action
 
-Manually verify tutorial and mic behavior in a browser, then replace temporary dragon placeholders with licensed production-safe assets.
+Review the pause menu and tutorial screens visually in a browser, then replace temporary dragon placeholders with licensed production-safe assets.

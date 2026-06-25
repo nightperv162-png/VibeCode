@@ -67,30 +67,34 @@
             duplicateWindowMs: 650
           },
           flow: {
-            initialPhase: "tutorial",
+            initialPhase: "menu",
             labels: {
               title: "Dragon Fighter",
               subtitle: "Choose your dragon. Master the arena.",
               playNow: "Play Now",
+              tutorial: "Tutorial",
               retryMatch: "Retry Match",
               backToMainMenu: "Back to Main Menu",
-              continue: "Continue"
+              continue: "Continue",
+              pause: "Pause",
+              resume: "Resume"
             },
             menu: {
               titleY: 230,
               subtitleY: 278,
-              playButton: { x: 565, y: 340, w: 270, h: 58 }
+              playButton: { x: 565, y: 326, w: 270, h: 58 },
+              tutorialButton: { x: 565, y: 398, w: 270, h: 52 }
             },
             tutorial: {
               storageKey: "dragon-fighter-tutorial-complete",
               panel: { x: 355, y: 110, w: 690, h: 390 },
-              titleY: 164,
+              titleY: 190,
               bodyX: 700,
-              bodyY: 230,
+              bodyY: 256,
               lineHeight: 28,
-              nextButton: { x: 560, y: 420, w: 135, h: 48 },
-              skipButton: { x: 405, y: 420, w: 135, h: 48 },
-              doneButton: { x: 705, y: 420, w: 135, h: 48 },
+              skipButton: { x: 478, y: 420, w: 135, h: 48 },
+              nextButton: { x: 633, y: 420, w: 135, h: 48 },
+              doneButton: { x: 788, y: 420, w: 135, h: 48 },
               steps: [
                 {
                   title: "Choose A Dragon",
@@ -115,6 +119,12 @@
               continueButton: { x: 565, y: 350, w: 270, h: 52 },
               retryButton: { x: 435, y: 350, w: 250, h: 52 },
               menuButton: { x: 715, y: 350, w: 250, h: 52 }
+            },
+            pause: {
+              panel: { x: 450, y: 145, w: 500, h: 330 },
+              resumeButton: { x: 565, y: 245, w: 270, h: 52 },
+              retryButton: { x: 565, y: 315, w: 270, h: 52 },
+              menuButton: { x: 565, y: 385, w: 270, h: 52 }
             }
           },
           combatStart: {
@@ -255,7 +265,7 @@
               defence: { x: 454, y: 548, w: 108, h: 44 },
               block: { x: 604, y: 548, w: 108, h: 44 },
               ultimate: { x: 754, y: 548, w: 108, h: 44 },
-              restart: { x: 1130, y: 548, w: 148, h: 44 },
+              pause: { x: 1130, y: 548, w: 148, h: 44 },
               chooseDragonAgain: { x: 601, y: 548, w: 198, h: 44 }
             }
           }
@@ -313,6 +323,10 @@
             message: initialPhase === "tutorial" ? "Welcome to Dragon Fighter." : config.flow.labels.title,
             note: initialPhase === "tutorial" ? "Next explains the basics." : config.flow.labels.subtitle,
             result: "",
+            paused: false,
+            pauseStartedAt: 0,
+            pauseRenderNow: 0,
+            frenzyTimer: 0,
             stage: 1,
             victories: 0,
             battleOutcome: null,
@@ -459,6 +473,7 @@
         const rand = (a, b) => a + Math.random() * (b - a);
         const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
         const log = (name, data = {}) => console.log("[DragonFighter]", name, data);
+        const visualNow = () => state.paused ? state.pauseRenderNow : performance.now();
 
         function removeConnectedLightBackground(imageData, width, height, settings) {
           const data = imageData.data;
@@ -592,6 +607,10 @@
           state.note = "Voice commands use one full English word. Mic on disables manual combat controls.";
           state.result = "";
           state.battleOutcome = null;
+          state.paused = false;
+          state.pauseStartedAt = 0;
+          state.pauseRenderNow = 0;
+          state.frenzyTimer = 0;
           initializeCombatCooldowns();
           state.defenceTimer = 0;
           state.blockTimer = 0;
@@ -609,6 +628,16 @@
           state.note = "Select a dragon, then confirm to battle.";
           state.playerState = "Choose";
           log("play_now");
+        }
+
+        function openTutorial() {
+          if (state.phase !== "menu") return;
+          state.phase = "tutorial";
+          state.tutorialStep = 0;
+          state.tutorialComplete = false;
+          state.message = "Welcome to Dragon Fighter.";
+          state.note = "Next explains the basics.";
+          log("tutorial_open");
         }
 
         function completeTutorial() {
@@ -645,6 +674,41 @@
           log("back_to_main_menu");
         }
 
+        function pauseMatch() {
+          if (state.phase !== "playing" || state.paused) return;
+          state.paused = true;
+          state.pauseStartedAt = performance.now();
+          state.pauseRenderNow = state.pauseStartedAt;
+          clearVoiceCommandQueue();
+          state.message = "Match paused.";
+          state.note = "Resume, retry this match, or return to Main Menu.";
+          log("pause_match");
+        }
+
+        function resumeMatch() {
+          if (state.phase !== "playing" || !state.paused) return;
+          state.paused = false;
+          state.pauseStartedAt = 0;
+          state.pauseRenderNow = 0;
+          state.message = "Match resumed.";
+          state.note = "Battle continues.";
+          log("resume_match");
+        }
+
+        function retryPausedMatch() {
+          if (state.phase !== "playing" || !state.paused) return;
+          const dragonId = state.selectedDragonId;
+          const stage = state.stage;
+          const upgrades = { ...state.upgrades };
+          state.selectedDragonId = dragonId;
+          state.stage = stage;
+          state.upgrades = upgrades;
+          reset();
+          state.message = `Retrying Stage ${state.stage}.`;
+          state.note = "Same setup restored from the pause menu.";
+          log("pause_retry_match", { dragonId, stage });
+        }
+
         function chooseDragonAgain() {
           clearVoiceCommandQueue();
           state.phase = "select";
@@ -664,6 +728,10 @@
           state.message = "Choose your dragon.";
           state.note = "Select a dragon, then confirm to battle.";
           state.result = "";
+          state.paused = false;
+          state.pauseStartedAt = 0;
+          state.pauseRenderNow = 0;
+          state.frenzyTimer = 0;
           state.cd.attack = 0;
           state.cd.defence = 0;
           state.cd.block = 0;
@@ -741,11 +809,11 @@
         }
 
         function manualCombatInputDisabled() {
-          return micRequested;
+          return micRequested || state.paused;
         }
 
         function processRecognizedCommand(command, signature = command, now = performance.now()) {
-          if (!micRequested || state.phase !== "playing" || !command) return false;
+          if (!micRequested || state.phase !== "playing" || state.paused || !command) return false;
           const duplicate = signature === lastVoiceCommand.signature && now - lastVoiceCommand.at < cfg.voice.duplicateWindowMs;
           if (duplicate) {
             log("voice_duplicate_ignored", { command });
@@ -836,6 +904,10 @@
 
         function useCommand(cmd, source = "button") {
           if (state.phase !== "playing") return;
+          if (state.paused) {
+            log("paused_command_ignored", { cmd, source });
+            return;
+          }
           if (source !== "voice" && manualCombatInputDisabled()) {
             state.message = "Manual combat controls are disabled while mic is on.";
             state.note = "Use voice commands or stop the mic to use buttons and keys.";
@@ -921,7 +993,7 @@
         }
 
         function enemyAttack() {
-          if (state.phase !== "playing") return;
+          if (state.phase !== "playing" || state.paused) return;
           const enemy = core.getEnemyStats(cfg, state);
 
           state.enemyState = "Attack Cast";
@@ -945,7 +1017,7 @@
         }
 
         function finish(result) {
-          if (state.phase !== "playing") return;
+          if (state.phase !== "playing" || state.paused) return;
           clearVoiceCommandQueue();
           const won = result.includes("WIN");
           state.phase = "result";
@@ -1045,7 +1117,9 @@
         }
 
         function update(dt) {
+          if (state.paused) return;
           if (state.shake > 0) state.shake -= dt;
+          if (state.frenzyTimer > 0) state.frenzyTimer = Math.max(0, state.frenzyTimer - dt);
           ["attack", "defence", "block", "ultimate"].forEach((k) => {
             state.cd[k] = Math.max(0, state.cd[k] - dt);
           });
@@ -1137,7 +1211,9 @@
           if (state.phase === "menu") {
             buttons.length = 0;
             const play = cfg.flow.menu.playButton;
+            const tutorial = cfg.flow.menu.tutorialButton;
             canvasButton("playNow", play.x, play.y, play.w, play.h, cfg.flow.labels.playNow, "#f6c453dd", "#fff4d6");
+            canvasButton("openTutorial", tutorial.x, tutorial.y, tutorial.w, tutorial.h, cfg.flow.labels.tutorial, "#102a4cdd", "#87d5ff");
             return;
           }
 
@@ -1171,6 +1247,14 @@
             return;
           }
 
+          if (state.paused) {
+            const pause = cfg.flow.pause;
+            canvasButton("resumeMatch", pause.resumeButton.x, pause.resumeButton.y, pause.resumeButton.w, pause.resumeButton.h, cfg.flow.labels.resume, "#164e35dd", "#34d399");
+            canvasButton("retryPausedMatch", pause.retryButton.x, pause.retryButton.y, pause.retryButton.w, pause.retryButton.h, cfg.flow.labels.retryMatch, "#713f12dd", "#f6c453");
+            canvasButton("backToMainMenu", pause.menuButton.x, pause.menuButton.y, pause.menuButton.w, pause.menuButton.h, cfg.flow.labels.backToMainMenu, "#102a4cdd", "#87d5ff");
+            return;
+          }
+
           const controls = cfg.battleLayout.controls;
           const manualDisabled = manualCombatInputDisabled();
           canvasButton("mic", controls.mic.x, controls.mic.y, controls.mic.w, controls.mic.h, micRequested ? "Stop Mic" : "Start Mic", listening ? "#164e35dd" : micRequested ? "#713f12dd" : "#f6c453dd", "#f6c453");
@@ -1178,7 +1262,7 @@
           canvasButton("defence", controls.defence.x, controls.defence.y, controls.defence.w, controls.defence.h, "Defence", manualDisabled ? "#1f2937aa" : "#16324add", manualDisabled ? "#64748b" : "#60a5fa", manualDisabled);
           canvasButton("block", controls.block.x, controls.block.y, controls.block.w, controls.block.h, "Block", manualDisabled ? "#1f2937aa" : "#3b2b12dd", manualDisabled ? "#64748b" : "#f6c453", manualDisabled);
           canvasButton("ultimate", controls.ultimate.x, controls.ultimate.y, controls.ultimate.w, controls.ultimate.h, "Ultimate", manualDisabled ? "#1f2937aa" : "#30215bdd", manualDisabled ? "#64748b" : "#a78bfa", manualDisabled);
-          canvasButton("restart", controls.restart.x, controls.restart.y, controls.restart.w, controls.restart.h, "Restart", "#102a4cdd", "#87d5ff");
+          canvasButton("pauseMatch", controls.pause.x, controls.pause.y, controls.pause.w, controls.pause.h, cfg.flow.labels.pause, "#102a4cdd", "#87d5ff");
 
           ctx.textAlign = "center";
           ctx.fillStyle = "#cbd5e1";
@@ -1344,6 +1428,21 @@
           ctx.fillStyle = "#cbd5e1";
           ctx.font = "20px system-ui";
           ctx.fillText(won ? "Victory secured. Continue your run." : "Retry this setup or return to the main menu.", cfg.viewport.centerX, 305);
+          ctx.textAlign = "left";
+        }
+
+        function drawPauseOverlay() {
+          const panel = cfg.flow.pause.panel;
+          ctx.fillStyle = "#02061799";
+          ctx.fillRect(0, 0, cfg.viewport.width, cfg.viewport.height);
+          rr(panel.x, panel.y, panel.w, panel.h, 24, "#0f172af2", "#87d5ff");
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#fff4d6";
+          ctx.font = "bold 42px system-ui";
+          ctx.fillText("Paused", cfg.viewport.centerX, panel.y + 72);
+          ctx.fillStyle = "#cbd5e1";
+          ctx.font = "17px system-ui";
+          ctx.fillText("Combat is frozen until you resume or choose another route.", cfg.viewport.centerX, panel.y + 108);
           ctx.textAlign = "left";
         }
 
@@ -1523,7 +1622,7 @@
           const defenceActive = state.defenceTimer > 0;
           if (!blockActive && !defenceActive) return;
 
-          const now = performance.now() / 1000;
+          const now = visualNow() / 1000;
           const color = blockActive ? "#f6c453" : "#60a5fa";
           const radius = Math.max(layout.w, layout.h) * (blockActive ? 0.56 : 0.5);
           const pulse = 1 + Math.sin(now * (blockActive ? 12 : 7)) * 0.025;
@@ -1573,7 +1672,7 @@
         }
 
         function drawEnemyTierAura(layout, enemy) {
-          const now = performance.now() / 1000;
+          const now = visualNow() / 1000;
           const radius = Math.max(layout.w, layout.h) * 0.42 * enemy.scale;
           ctx.save();
           ctx.translate(layout.x, layout.y);
@@ -1763,7 +1862,7 @@
 
           ctx.fillStyle = listening ? "#34d399" : micRequested ? "#f6c453" : "#fca5a5";
           ctx.font = "bold 16px system-ui";
-          ctx.fillText(listening ? "Mic listening • 1s scan" : micRequested ? "Mic reconnecting" : "Mic off", layout.mic.x, layout.mic.y);
+          ctx.fillText(listening ? "Mic listening - 0.5s check" : micRequested ? "Mic reconnecting" : "Mic off", layout.mic.x, layout.mic.y);
 
           rr(layout.message.x, layout.message.y, layout.message.w, layout.message.h, 18, "#07101dd9", "#f6c45366");
           ctx.textAlign = "center";
@@ -1773,10 +1872,11 @@
           ctx.textAlign = "left";
 
           drawCommandPanel(layout.playerCommand, "P1 COMMAND", state.accepted, "left");
-          drawCommandPanel(layout.commandReference, "COMMANDS • 1s VOICE WINDOW", "Attack | Defence | Block | Ultimate/Skill");
+          drawCommandPanel(layout.commandReference, "COMMANDS - ONE FULL WORD", "Attack | Defence | Block | Ultimate/Skill");
           drawCommandPanel(layout.enemyCommand, "P2 / AI COMMAND", state.enemyAccepted, "right");
 
           if (state.phase === "result") drawResultOverlay();
+          if (state.paused) drawPauseOverlay();
 
           drawControls();
 
@@ -1913,6 +2013,22 @@
             playNow();
             return;
           }
+          if (button.id === "openTutorial") {
+            openTutorial();
+            return;
+          }
+          if (button.id === "pauseMatch") {
+            pauseMatch();
+            return;
+          }
+          if (button.id === "resumeMatch") {
+            resumeMatch();
+            return;
+          }
+          if (button.id === "retryPausedMatch") {
+            retryPausedMatch();
+            return;
+          }
           if (button.id === "retryMatch") {
             retryLastBattle();
             return;
@@ -1945,7 +2061,6 @@
           if (button.id === "defence") useCommand("defence", "canvas");
           if (button.id === "block") useCommand("block", "canvas");
           if (button.id === "ultimate") useCommand("ultimate", "canvas");
-          if (button.id === "restart") reset();
           if (button.id === "chooseDragonAgain") chooseDragonAgain();
         });
 
@@ -1976,11 +2091,18 @@
             continueWithMaxUpgrades();
             return;
           }
+          if (state.paused && k === "escape") {
+            resumeMatch();
+            return;
+          }
+          if (state.phase === "playing" && !state.paused && k === "p") {
+            pauseMatch();
+            return;
+          }
           if (!manualCombatInputDisabled() && k === "a") useCommand("attack", "keyboard");
           if (!manualCombatInputDisabled() && k === "d") useCommand("defence", "keyboard");
           if (!manualCombatInputDisabled() && k === "b") useCommand("block", "keyboard");
           if (!manualCombatInputDisabled() && k === "u") useCommand("ultimate", "keyboard");
-          if (k === "r" && state.phase === "playing") reset();
         });
 
         window.DragonFighter = {
@@ -1988,14 +2110,19 @@
           state,
           core,
           playNow,
+          openTutorial,
           nextTutorialStep,
           completeTutorial,
           confirmDragon,
+          pauseMatch,
+          resumeMatch,
+          retryPausedMatch,
           finish,
           continueAfterWin,
           retryLastBattle,
           backToMainMenu,
           reset,
+          update,
           toggleMic,
           useCommand,
           processRecognizedCommand,

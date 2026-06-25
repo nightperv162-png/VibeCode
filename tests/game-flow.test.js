@@ -74,16 +74,19 @@ function startBattle(app, dragonId = "ember") {
   app.confirmDragon();
 }
 
-test("tutorial flow works before Main Menu and Play Now opens Dragon Select", () => {
+test("game starts at Main Menu and tutorial can be opened before Play Now", () => {
   const app = loadGame();
   assert.equal(app.state.phase, app.CONFIG.flow.initialPhase);
+  assert.equal(app.state.phase, "menu");
+  assert.equal(app.CONFIG.flow.labels.playNow, "Play Now");
+
+  app.openTutorial();
   assert.equal(app.state.phase, "tutorial");
   assert.equal(app.state.tutorialStep, 0);
   app.nextTutorialStep();
   assert.equal(app.state.tutorialStep, 1);
   app.completeTutorial();
   assert.equal(app.state.phase, "menu");
-  assert.equal(app.CONFIG.flow.labels.playNow, "Play Now");
 
   app.playNow();
   assert.equal(app.state.phase, "select");
@@ -249,4 +252,121 @@ test("buttons and combat keys work again after mic is stopped", () => {
   app.state.cd.attack = 0;
   app.__test.keyHandlers[0]({ key: "a" });
   assert.equal(app.state.accepted, "ATTACK");
+});
+
+test("Pause button replaces Restart in combat controls", () => {
+  const app = loadGame();
+  startBattle(app);
+  app.draw();
+
+  const ids = app.getButtons().map((button) => button.id);
+  assert.ok(ids.includes("pauseMatch"));
+  assert.ok(!ids.includes("restart"));
+});
+
+test("pause freezes timer, AI, cooldowns, effects, projectiles, and Frenzy", () => {
+  const app = loadGame();
+  startBattle(app);
+  app.state.time = 40;
+  app.state.enemyTimer = 1.2;
+  app.state.cd.attack = 2;
+  app.state.shake = 0.5;
+  app.state.frenzyTimer = 3;
+  app.state.particles.push({ x: 10, y: 10, vx: 20, vy: 20, life: 0.6, max: 0.8, size: 4, color: "#fff" });
+  app.state.pendingAttacks.push({ elapsed: 0.2, castTime: 0.1, travelTime: 1, command: "attack" });
+
+  app.pauseMatch();
+  app.update(1);
+
+  assert.equal(app.state.paused, true);
+  assert.equal(app.state.time, 40);
+  assert.equal(app.state.enemyTimer, 1.2);
+  assert.equal(app.state.cd.attack, 2);
+  assert.equal(app.state.shake, 0.5);
+  assert.equal(app.state.frenzyTimer, 3);
+  assert.equal(app.state.particles[0].life, 0.6);
+  assert.equal(app.state.particles[0].x, 10);
+  assert.equal(app.state.pendingAttacks[0].elapsed, 0.2);
+});
+
+test("voice and manual combat commands do nothing while paused", () => {
+  const app = loadGame();
+  startBattle(app);
+  app.toggleMic();
+  app.pauseMatch();
+  app.draw();
+
+  const attackButton = app.getButtons().find((button) => button.id === "attack");
+  assert.equal(attackButton, undefined);
+  assert.equal(app.manualCombatInputDisabled(), true);
+  assert.equal(app.processRecognizedCommand("attack", "paused:attack", 1000), false);
+  app.useCommand("attack", "canvas");
+  app.__test.keyHandlers[0]({ key: "a" });
+
+  assert.equal(app.state.accepted, "-");
+  assert.equal(app.state.pendingAttacks.length, 0);
+});
+
+test("Resume continues the same match", () => {
+  const app = loadGame();
+  startBattle(app, "tide");
+  app.state.stage = 2;
+  app.state.time = 37;
+  app.state.enemyHp = 42;
+  app.pauseMatch();
+  app.resumeMatch();
+  app.update(1);
+
+  assert.equal(app.state.paused, false);
+  assert.equal(app.state.phase, "playing");
+  assert.equal(app.state.selectedDragonId, "tide");
+  assert.equal(app.state.stage, 2);
+  assert.equal(app.state.enemyHp, 42);
+  assert.ok(app.state.time < 37);
+});
+
+test("Pause Retry Match keeps setup but resets battle state", () => {
+  const app = loadGame();
+  startBattle(app, "moss");
+  app.state.stage = 4;
+  app.state.upgrades.power = 3;
+  app.state.playerHp = 12;
+  app.state.enemyHp = 9;
+  app.state.time = 8;
+  app.state.cd.attack = 2;
+  app.state.pendingAttacks.push({ command: "attack" });
+  app.state.frenzyTimer = 5;
+  app.pauseMatch();
+  app.retryPausedMatch();
+
+  assert.equal(app.state.phase, "playing");
+  assert.equal(app.state.paused, false);
+  assert.equal(app.state.selectedDragonId, "moss");
+  assert.equal(app.state.stage, 4);
+  assert.equal(app.state.upgrades.power, 3);
+  assert.equal(app.state.playerHp, app.core.getPlayerMaxHp(app.CONFIG, app.state));
+  assert.equal(app.state.enemyHp, app.core.getEnemyStats(app.CONFIG, app.state).maxHp);
+  assert.equal(app.state.time, app.CONFIG.matchTime);
+  assert.equal(app.state.cd.ultimate, app.core.getCommandCooldown(app.CONFIG, app.state, "ultimate"));
+  assert.equal(app.state.pendingAttacks.length, 0);
+  assert.equal(app.state.accepted, "-");
+  assert.equal(app.state.frenzyTimer, 0);
+});
+
+test("Pause Back to Main Menu resets progress and returns correctly", () => {
+  const app = loadGame();
+  startBattle(app, "ember");
+  app.state.stage = 5;
+  app.state.victories = 4;
+  app.state.upgrades.guard = 2;
+  app.pauseMatch();
+  app.backToMainMenu();
+
+  assert.equal(app.state.phase, "menu");
+  assert.equal(app.state.paused, false);
+  assert.equal(app.state.selectedDragonId, null);
+  assert.equal(app.state.stage, 1);
+  assert.equal(app.state.victories, 0);
+  assert.equal(app.state.upgrades.guard, 0);
+  assert.equal(app.state.pendingAttacks.length, 0);
 });

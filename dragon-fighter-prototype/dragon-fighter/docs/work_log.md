@@ -116,3 +116,21 @@
 - `node --test tests/game-flow.test.js` passed: 11 tests, 11 pass.
 - `git diff --check` passed.
 - Local static server check returned HTTP 200 at `http://127.0.0.1:5174/index.html`.
+- Centered the tutorial Skip, Next, and Done buttons by moving their config positions to a centered row around the Canvas midpoint.
+- `node --test tests/game-flow.test.js` passed: 11 tests, 11 pass.
+- `git diff --check` passed.
+- Changed the first screen back to Main Menu, added a Main Menu Tutorial button, and lowered the tutorial title/body text.
+- Updated the tutorial flow test for Main Menu-first behavior.
+- `node --test tests/game-flow.test.js` passed: 11 tests, 11 pass.
+- `git diff --check` passed.
+
+### Pause Menu
+
+- Replaced the combat Restart button with a Pause button in root `index.html`.
+- Added Canvas pause overlay actions for Resume, Retry Match, and Back to Main Menu.
+- Added paused state handling to freeze match timer, AI, cooldowns, particles/effects, pending projectiles, render-time animations, and Frenzy timer state.
+- Ignored voice and manual combat commands while paused while keeping pause menu navigation active.
+- Expanded `tests/game-flow.test.js` to 17 tests covering pause button replacement, freeze behavior, command blocking, resume, retry reset, and Main Menu reset.
+- `node --test tests/game-flow.test.js` passed: 17 tests, 17 pass.
+- `git diff --check` passed.
+- Local static server check returned HTTP 200 at `http://127.0.0.1:5174/index.html`.
