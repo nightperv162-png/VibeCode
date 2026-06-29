@@ -85,3 +85,9 @@ Post-Milestone 3 - Current documentation alignment.
 ## Next Action
 
 Review the pause menu and tutorial screens visually in a browser, then replace temporary dragon placeholders with licensed production-safe assets.
+
+## Latest Documentation Work
+
+- Created `docs/sumup.md` as a slide-ready summary of the current Dragon Fighter prototype.
+- Used the implemented Q/W/E/R shortcut mapping from the current game and latest work log rather than the stale A/D/B/U mapping still present in older GDD text.
+- Updated `docs/gdd.md`, `docs/tdd.md`, and `docs/plan.md` to reflect the current single-file game, optional tutorial, pause flow, Q/W/E/R combat keys, Web Speech behavior, Change Dragon confirmation, and 21-test validation surface.

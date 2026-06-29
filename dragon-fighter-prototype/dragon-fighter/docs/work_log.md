@@ -169,3 +169,16 @@
 - Added test coverage for the confirmation flow.
 - `node --test tests/game-flow.test.js` passed: 21 tests, 21 pass.
 - `git diff --check` passed.
+
+## 2026-06-29
+
+### Slide Summary Document
+
+- Reviewed the current GDD, TDD, plan, project memory, agent state, work log, and root `index.html`.
+- Added `docs/sumup.md` as a slide-ready project summary covering concept, flow, dragons, combat, inputs, progression, architecture, tests, constraints, and next steps.
+- Reflected the current implemented Q/W/E/R combat shortcuts from `index.html` and the latest work log.
+
+### Current Documentation Alignment
+
+- Reviewed current docs, `tests/game-flow.test.js`, and root `index.html` signals for tutorial, pause, voice, key mapping, confirmation, progression, and testing behavior.
+- Updated `docs/gdd.md`, `docs/tdd.md`, and `docs/plan.md` to remove stale A/D/B/U and six-test claims and add current Main Menu, Tutorial, Q/W/E/R, Pause, Change Dragon confirmation, Web Speech, and 21-test details.

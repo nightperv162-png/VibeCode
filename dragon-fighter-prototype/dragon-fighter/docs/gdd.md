@@ -2,24 +2,29 @@
 
 ## Pitch
 
-Dragon Fighter is a short Canvas-based dragon dueling game. The player chooses one of three dragons, issues combat commands by voice, keyboard, or Canvas buttons, and advances through increasingly strong AI opponents by selecting upgrades after victories.
+Dragon Fighter is a short browser-based dragon dueling prototype. The player chooses a dragon, fights AI opponents with timed commands, and grows stronger by selecting one upgrade after each victory.
+
+The main fantasy is voice-command combat, but the game also supports keyboard and Canvas button input so the prototype remains playable when speech recognition is unavailable.
 
 ## Design Pillars
 
-- **Voice first, not voice only:** spoken commands are the primary fantasy; buttons and keys provide reliable fallbacks.
-- **Decisions over movement:** combat is about command timing, cooldowns, Defence, and Block rather than positioning.
-- **Readable feedback:** HP, cooldowns, states, accepted commands, projectiles, and results remain visible in one arena view.
-- **Short progression runs:** wins lead to an upgrade and a stronger stage; losses allow an exact retry or a clean return to the Main Menu.
+- **Voice first, not voice only:** speech creates the fantasy; keyboard and Canvas controls provide reliable fallbacks.
+- **Timing over movement:** combat decisions come from cooldowns, Defence, Block, and Ultimate timing rather than positioning.
+- **One readable arena:** HP, cooldowns, accepted commands, states, projectiles, pause/result overlays, and feedback stay inside one Canvas.
+- **Short progression runs:** a win leads to one upgrade and a harder stage; a loss or draw can be retried with the same setup.
 
 ## Current Flow
 
-1. Main Menu: **Play Now**.
-2. Dragon Select: choose Ember, Tide, or Moss and confirm.
-3. Combat: fight the stage opponent for up to 60 seconds.
-4. Result:
-   - Win: **Continue** to the upgrade screen, choose one upgrade, then begin the next stage.
-   - Lose or Draw: **Retry Match** with the same dragon, stage, and upgrades, or **Back to Main Menu** to reset the run.
-5. Changing dragon from the upgrade screen also starts a fresh run.
+1. Main Menu starts the game and can open the Tutorial.
+2. Tutorial explains dragon choice, commands, cooldowns, and combat rhythm; completion is saved in localStorage when available.
+3. Play Now opens Dragon Select.
+4. The player chooses Ember, Tide, or Moss and confirms.
+5. Battle runs for up to 60 seconds against the current stage opponent.
+6. Pause can freeze the match and offer Resume, Retry Match, or Back to Main Menu.
+7. Result:
+   - Win: Continue to the upgrade screen.
+   - Loss or Draw: Retry Match with the same dragon, stage, and upgrades, or return to Main Menu.
+8. Upgrade screen gives one upgrade choice after a win. Changing dragon requires confirmation and starts a fresh run.
 
 ## Dragons
 
@@ -33,38 +38,40 @@ Dragon Fighter is a short Canvas-based dragon dueling game. The player chooses o
 - Match time: 60 seconds.
 - **Attack:** 12 base damage, 1 second base cooldown.
 - **Defence:** reduces incoming damage by 50% for 3 seconds, 4 second cooldown.
-- **Block:** prevents all incoming damage for 1 second, 7 second base cooldown.
+- **Block:** prevents incoming damage for 1 second, 7 second base cooldown.
 - **Ultimate / Skill:** 35 base damage, 9 second base cooldown.
-- Ultimate starts on its full normal cooldown at the beginning of every battle and retry.
-- Block takes priority over Defence when an enemy projectile lands.
-- The AI attacks automatically at a stage-scaled random interval.
-- Reaching 0 HP loses; defeating the opponent wins. At timeout, higher HP wins and equal HP draws.
+- Ultimate starts on full cooldown at the beginning of each new or retried battle.
+- Block takes priority over Defence when enemy damage lands.
+- Attack and Ultimate use projectile timing: cast warning, travel, then damage resolution.
+- The AI currently attacks automatically at stage-scaled random intervals.
+- Reducing the enemy to 0 HP wins. Reaching 0 player HP loses. At timeout, higher HP wins; equal HP draws.
 
 ## Progression
 
-- Each win increments the victory count and unlocks one upgrade choice.
+- Each victory increments the run and unlocks one upgrade choice.
 - **Power:** +10% Attack and Ultimate damage per rank.
 - **Vitality:** +12 maximum HP per rank.
-- **Guard:** +0.2 seconds Defence duration and -0.25 seconds Block cooldown per rank.
-- **Focus:** -5% Attack and Ultimate cooldowns per rank, with a configured floor.
-- Later stages increase enemy HP and damage, shorten attack intervals, and rotate through configured enemy identities.
+- **Guard:** +0.2 seconds Defence duration and -0.25 seconds Block cooldown per rank, with a cooldown floor.
+- **Focus:** -5% Attack and Ultimate cooldowns per rank, with a configured multiplier floor.
+- Later stages increase enemy HP and damage, shorten enemy attack waits, scale enemy size, and rotate enemy identities.
 
 ## Controls
 
-- Voice: Attack, Defence/Defense, Block, Ultimate, or Skill.
-- Canvas: microphone toggle and all four combat commands.
-- Keyboard: `A`, `D`, `B`, `U`; `R` restarts the active battle; `Enter` confirms menu/result steps; number keys choose upgrades.
-
-All input methods call the same command path and obey the same phase and cooldown rules.
+- Voice: Attack, Defence/Defense, Block, Ultimate, or Skill. Voice accepts one full command word.
+- Keyboard combat shortcuts: `Q` Attack, `W` Defence, `E` Block, `R` Ultimate/Skill.
+- Keyboard navigation: `Enter` advances supported menu/tutorial/result steps, `Escape` exits tutorial or resumes pause, `P` pauses during battle, number keys choose upgrades.
+- Canvas: microphone toggle, command buttons, menu buttons, tutorial navigation, pause, result, upgrade, and confirmation controls.
+- Manual combat buttons and combat keys are disabled while microphone input is active; voice commands remain available.
 
 ## Presentation
 
 - All player-facing UI is drawn inside a 1400 by 620 Canvas.
-- Local arena, dragon, and projectile assets are used with Canvas fallbacks for missing dragon/background images.
-- Projectiles, shields, particles, screen shake, status labels, and cooldown indicators provide combat feedback.
+- Local arena, dragon, and projectile assets are used with Canvas fallbacks for missing images.
+- Combat feedback includes projectiles, shield/guard effects, particles, screen shake, status labels, cooldown indicators, and accepted-command panels.
 
 ## Scope Boundaries
 
-- No movement, aiming, online multiplayer, accounts, monetization, or persistent save system.
-- The run exists only in memory and resets on page reload or Main Menu reset.
+- No movement, aiming, online multiplayer, accounts, monetization, persistent run save, or multiple arenas.
+- The current run exists in memory and resets on reload or Main Menu reset.
+- Tutorial completion may persist locally, but gameplay progression does not.
 - Current dragon images are temporary prototype assets and must be replaced with licensed production-safe assets before public release.
