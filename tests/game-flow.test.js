@@ -5,7 +5,10 @@ const vm = require("node:vm");
 
 function loadGame() {
   const html = fs.readFileSync("index.html", "utf8");
-  const source = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const scriptSrc = html.match(/<script\s+src="([^"]+)"><\/script>/)?.[1];
+  const source = scriptSrc
+    ? fs.readFileSync(scriptSrc, "utf8")
+    : html.match(/<script>([\s\S]*?)<\/script>/)[1];
   const intervals = [];
   const keyHandlers = [];
   const context2d = new Proxy({}, {

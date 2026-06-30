@@ -1,0 +1,25 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #0b1020;
+  overflow: hidden;
+}
+
+body {
+  display: grid;
+  place-items: center;
+}
+
+canvas {
+  aspect-ratio: 70 / 31;
+  background: #17223a;
+  border: 3px solid #f6c453;
+  border-radius: 20px;
+  box-sizing: border-box;
+  box-shadow: 0 20px 70px #0009;
+  display: block;
+  max-height: 100vh;
+  touch-action: none;
+  width: min(1400px, 100vw);
+}

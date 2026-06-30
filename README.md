@@ -1,8 +1,8 @@
 # Dragon Fighter
 
-A single-file HTML5 Canvas dragon battle prototype.
+An HTML5 Canvas dragon battle prototype.
 
-The playable game lives at the repository root in `index.html`. There is no build step and no generated deployment output. GitHub Pages should serve the repository root directly.
+The playable game lives at the repository root in `index.html`, with styles in `styles.css` and game logic in `game.js`. There is no build step and no generated deployment output. GitHub Pages should serve the repository root directly.
 
 ## Run Locally
 
