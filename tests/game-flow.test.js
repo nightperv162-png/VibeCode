@@ -143,6 +143,8 @@ function loadGame() {
   const app = window.DragonFighter;
   const originalProcessVoiceTick = app.processVoiceTick;
   app.processVoiceTick = (...args) => JSON.parse(JSON.stringify(originalProcessVoiceTick(...args)));
+  const originalQueueVoiceTranscript = app.queueVoiceTranscript;
+  app.queueVoiceTranscript = (...args) => JSON.parse(JSON.stringify(originalQueueVoiceTranscript(...args)));
   const originalGetSfxState = app.getSfxState;
   app.getSfxState = () => ({ ...originalGetSfxState() });
   app.__test = {
@@ -367,6 +369,7 @@ test("each mic activation uses a fresh recognition session for the next command"
   const firstRecognition = app.getRecognition();
   app.state.cd.attack = 0;
   assert.equal(app.processRecognizedCommand("attack", "session:attack", 1000), true);
+  app.stopMicHold();
   assert.equal(app.getRecognition(), null);
 
   app.toggleMic();
@@ -375,6 +378,7 @@ test("each mic activation uses a fresh recognition session for the next command"
   assert.notEqual(secondRecognition, firstRecognition);
   assert.equal(app.processRecognizedCommand("block", "session:block", 2000), true);
   assert.equal(app.state.accepted, "BLOCK");
+  app.stopMicHold();
   assert.equal(app.getRecognition(), null);
 });
 
@@ -388,15 +392,14 @@ test("valid full-word voice casts immediately when ready and cooldown blocks cas
   assert.equal(cast, true);
   assert.equal(app.state.accepted, "ATTACK");
   assert.ok(app.state.cd.attack > 0);
-  assert.equal(app.state.micListening, false);
+  assert.equal(app.state.micListening, true);
   const pendingAfterCast = app.state.pendingAttacks.length;
 
-  app.toggleMic();
   const cooldownCast = app.processRecognizedCommand(app.commandFromSpeech("attack"), "attack:2", 2000);
   assert.equal(cooldownCast, false);
   assert.equal(app.state.pendingAttacks.length, pendingAfterCast);
-  assert.match(app.state.message, /cooldown/i);
-  assert.equal(app.state.micListening, false);
+  assert.equal(app.state.voiceResult, "Duplicate");
+  assert.equal(app.state.micListening, true);
   assert.equal(app.commandFromSpeech("attack block"), null);
 });
 
@@ -467,16 +470,15 @@ test("processVoiceTick processes valid transcript into one command", () => {
   app.toggleMic();
   app.state.cd.attack = 0;
 
-  app.queueVoiceTranscript("attack", "voice:attack");
-  const result = app.processVoiceTick(1000);
+  const result = app.queueVoiceTranscript("attack ", "voice:attack", { now: 1000 });
 
   assert.equal(result.command, "attack");
   assert.equal(result.cast, true);
   assert.equal(app.state.accepted, "ATTACK");
   assert.equal(app.state.parsedCommand, "ATTACK");
   assert.equal(app.state.voiceResult, "Cast");
-  assert.equal(app.state.micListening, false);
-  assert.equal(app.gameplayMultiplier(), app.CONFIG.timerMultiplier);
+  assert.equal(app.state.micListening, true);
+  assert.equal(app.gameplayMultiplier(), app.CONFIG.timerMultiplier * app.CONFIG.micSlowTimeMultiplier);
 });
 
 test("voice phrase tries multiple commands in spoken order", () => {
@@ -486,8 +488,7 @@ test("voice phrase tries multiple commands in spoken order", () => {
   app.state.cd.attack = 0;
   app.state.cd.ultimate = 0;
 
-  app.queueVoiceTranscript("attack skill", "voice:multi");
-  const result = app.processVoiceTick(1000);
+  const result = app.queueVoiceTranscript("attack skill ", "voice:multi", { now: 1000 });
 
   assert.deepEqual(result.commands, ["attack", "ultimate"]);
   assert.equal(result.cast, true);
@@ -504,8 +505,7 @@ test("voice phrase still tries next command when earlier command is on cooldown"
   app.state.cd.attack = 2;
   app.state.cd.ultimate = 0;
 
-  app.queueVoiceTranscript("attack skill", "voice:skip");
-  const result = app.processVoiceTick(1000);
+  const result = app.queueVoiceTranscript("attack skill ", "voice:skip", { now: 1000 });
 
   assert.deepEqual(result.commands, ["attack", "ultimate"]);
   assert.equal(result.cast, true);
@@ -520,15 +520,14 @@ test("repeated speech attack attack triggers Attack only once", () => {
   app.toggleMic();
   app.state.cd.attack = 0;
 
-  app.queueVoiceTranscript("attack attack", "voice:repeat");
-  const result = app.processVoiceTick(1000);
+  const result = app.queueVoiceTranscript("attack attack ", "voice:repeat", { now: 1000 });
 
   assert.equal(result.command, "attack");
   assert.equal(result.cast, true);
   assert.equal(app.state.accepted, "ATTACK");
   assert.equal(app.state.pendingAttacks.length, 1);
   assert.equal(app.state.voiceResult, "Cast");
-  assert.equal(app.state.micListening, false);
+  assert.equal(app.state.micListening, true);
 });
 
 test("voice attack uses the configured damage bonus while keyboard attack stays normal", () => {
@@ -536,8 +535,7 @@ test("voice attack uses the configured damage bonus while keyboard attack stays 
   startBattle(voiceApp);
   voiceApp.toggleMic();
   voiceApp.state.cd.attack = 0;
-  voiceApp.queueVoiceTranscript("attack", "voice:bonus");
-  voiceApp.processVoiceTick(1000);
+  voiceApp.queueVoiceTranscript("attack ", "voice:bonus", { now: 1000 });
 
   const keyboardApp = loadGame();
   startBattle(keyboardApp);
@@ -552,8 +550,7 @@ test("voice defense lasts longer than keyboard defense", () => {
   startBattle(voiceApp);
   voiceApp.toggleMic();
   voiceApp.state.cd.defence = 0;
-  voiceApp.queueVoiceTranscript("defence", "voice:defense-bonus");
-  voiceApp.processVoiceTick(1000);
+  voiceApp.queueVoiceTranscript("defence ", "voice:defense-bonus", { now: 1000 });
 
   const keyboardApp = loadGame();
   startBattle(keyboardApp);
@@ -627,15 +624,14 @@ test("processVoiceTick shows cooldown feedback for cooldown command", () => {
   app.toggleMic();
   app.state.cd.attack = 1.8;
 
-  app.queueVoiceTranscript("attack", "voice:cooldown");
-  const result = app.processVoiceTick(1000);
+  const result = app.queueVoiceTranscript("attack ", "voice:cooldown", { now: 1000 });
 
   assert.equal(result.command, "attack");
   assert.equal(result.cast, false);
   assert.equal(app.state.parsedCommand, "ATTACK");
   assert.equal(app.state.voiceResult, "Cooldown");
   assert.match(app.state.message, /cooldown/i);
-  assert.equal(app.state.micListening, false);
+  assert.equal(app.state.micListening, true);
 });
 
 test("duplicate voice result does not cast twice", () => {
@@ -669,6 +665,8 @@ test("manual command buttons and combat keys are disabled while mic is active", 
   app.state.cd.attack = 0;
   assert.equal(app.processRecognizedCommand("attack", "attack:voice", 1000), true);
   assert.equal(app.state.accepted, "ATTACK");
+  assert.equal(app.manualCombatInputDisabled(), true);
+  app.stopMicHold();
   assert.equal(app.manualCombatInputDisabled(), false);
 });
 
@@ -696,13 +694,103 @@ test("voice command still works while mic disables manual controls", () => {
   pressKey(app, "w");
   assert.equal(app.state.accepted, "-");
 
-  app.queueVoiceTranscript("defence", "voice:defence");
-  const result = app.processVoiceTick(1000);
+  const result = app.queueVoiceTranscript("defence ", "voice:defence", { now: 1000 });
 
   assert.equal(result.command, "defence");
   assert.equal(result.cast, true);
   assert.equal(app.state.accepted, "DEFENSE");
   assert.ok(app.state.defenceTimer > 0);
+});
+
+test("voice text executes completed words immediately and pending word on release once", () => {
+  const app = loadGame();
+  startBattle(app);
+  app.toggleMic();
+  app.state.cd.attack = 0;
+  app.state.cd.ultimate = 0;
+
+  const result = app.queueVoiceTranscript("Attack Skill", "voice:pending-skill", { now: 1000 });
+
+  assert.deepEqual(result.commands, ["attack"]);
+  assert.equal(app.state.latestVoicePendingWord, "skill");
+  assert.equal(app.state.pendingAttacks.length, 1);
+  assert.equal(app.state.pendingAttacks[0].command, "attack");
+
+  app.stopMicHold();
+
+  assert.equal(app.state.pendingAttacks.length, 2);
+  assert.equal(app.state.pendingAttacks[1].command, "ultimate");
+  assert.equal(app.state.micListening, false);
+});
+
+test("voice text ignores filler, case, and punctuation before command spaces", () => {
+  const app = loadGame();
+  startBattle(app);
+  app.toggleMic();
+  app.state.cd.ultimate = 0;
+
+  const result = app.queueVoiceTranscript("hello Skill, ", "voice:filler", { now: 1000 });
+
+  assert.deepEqual(result.commands, ["ultimate"]);
+  assert.equal(result.cast, true);
+  assert.equal(app.state.accepted, "ULTIMATE");
+});
+
+test("cooldown-failed voice command is removed from queue and not repeated", () => {
+  const app = loadGame();
+  startBattle(app);
+  app.toggleMic();
+  app.state.cd.attack = 2;
+
+  const result = app.queueVoiceTranscript("Attack Attack ", "voice:cooldown-repeat", { now: 1000 });
+
+  assert.deepEqual(result.commands, ["attack"]);
+  assert.equal(result.cast, false);
+  assert.equal(app.state.voiceResult, "Cooldown");
+  assert.equal(app.state.voiceTextQueue.length, 0);
+  assert.equal(app.state.pendingAttacks.length, 0);
+});
+
+test("successful mic command reduces other cooldowns but not its own", () => {
+  const app = loadGame();
+  startBattle(app);
+  app.CONFIG.ultimateCd = 10;
+  app.CONFIG.blockCd = 5;
+  app.toggleMic();
+  app.state.cd.attack = 0;
+  app.state.cd.defence = 4;
+  app.state.cd.block = 1;
+  app.state.cd.ultimate = 8;
+
+  const result = app.queueVoiceTranscript("attack ", "voice:cooldown-reward", { now: 1000 });
+
+  assert.equal(result.cast, true);
+  assert.equal(app.state.cd.attack, app.core.getCommandCooldown(app.CONFIG, app.state, "attack"));
+  assert.equal(app.state.cd.defence, 4 - app.core.getCommandCooldown(app.CONFIG, app.state, "defence") * app.CONFIG.micCooldownReductionPercent);
+  assert.equal(app.state.cd.block, 0);
+  assert.equal(app.state.cd.ultimate, 6);
+});
+
+test("keyboard and canvas commands do not reduce cooldowns or touch voice queue", () => {
+  const keyboardApp = loadGame();
+  startBattle(keyboardApp);
+  keyboardApp.state.cd.attack = 0;
+  keyboardApp.state.cd.defence = 4;
+  keyboardApp.state.voiceTextQueue.push("block");
+  pressKey(keyboardApp, "q");
+
+  assert.equal(keyboardApp.state.cd.defence, 4);
+  assert.deepEqual(Array.from(keyboardApp.state.voiceTextQueue), ["block"]);
+
+  const canvasApp = loadGame();
+  startBattle(canvasApp);
+  canvasApp.state.cd.attack = 0;
+  canvasApp.state.cd.defence = 4;
+  canvasApp.state.voiceTextQueue.push("block");
+  assert.equal(canvasApp.useCommand("attack", "canvas"), true);
+
+  assert.equal(canvasApp.state.cd.defence, 4);
+  assert.deepEqual(Array.from(canvasApp.state.voiceTextQueue), ["block"]);
 });
 
 test("Q W E R trigger Attack Defense Block and Ultimate", () => {
