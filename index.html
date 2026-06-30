@@ -109,12 +109,12 @@
               doneButton: { x: 710, y: 420, w: 135, h: 48 },
               steps: [
                 {
-                  title: "Choose A Dragon",
-                  body: "Pick Ember, Tide, or Moss. Each dragon changes your Attack, Defence, or Skill timing."
+                  title: "Choose a Dragon",
+                  body: "Pick Ember, Tide, or Moss. Each dragon changes your Attack, Defense, or Ultimate timing."
                 },
                 {
                   title: "Fight With Four Commands",
-                  body: "Use Attack, Defence, Block, and Ultimate. Speak one full command word, press Q/W/E/R, or tap a command button."
+                  body: "Use Attack, Defense, Block, and Ultimate. Speak one full command word, press Q/W/E/R, or tap a command button."
                 },
                 {
                   title: "Watch Cooldowns",
@@ -122,7 +122,7 @@
                 },
                 {
                   title: "Build Frenzy",
-                  body: "Stay aggressive, time your defence, and keep pressure high to play in a Frenzy rhythm."
+                  body: "Stay aggressive, time your defense, and keep pressure high to play in a Frenzy rhythm."
                 }
               ]
             },
@@ -171,7 +171,7 @@
             upgrades: {
               power: { name: "Power", color: "#fb923c", maxRank: 8, description: "+10% Attack and Ultimate damage" },
               vitality: { name: "Vitality", color: "#34d399", maxRank: 8, description: "+12 maximum HP" },
-              guard: { name: "Guard", color: "#60a5fa", maxRank: 8, description: "+0.2s Defence; -0.25s Block cooldown" },
+              guard: { name: "Guard", color: "#60a5fa", maxRank: 8, description: "+0.2s Defense; -0.25s Block cooldown" },
               focus: { name: "Focus", color: "#a78bfa", maxRank: 7, description: "-5% Attack and Ultimate cooldowns" }
             }
           },
@@ -223,7 +223,7 @@
             {
               id: "tide",
               name: "Tide",
-              role: "Defence Focus",
+              role: "Defense Focus",
               flavor: "A patient guardian that turns pressure into survival.",
               asset: "./dragon-fighter-prototype/dragon-fighter/public/assets/dragons/holy-paladin-dragon-adult.png",
               modifiers: {
@@ -837,8 +837,16 @@
           return Object.entries(cfg.combatKeys).find(([, mappedKey]) => mappedKey === normalizedKey)?.[0] || null;
         }
 
+        function commandDisplayName(command) {
+          if (command === "defence") return "Defense";
+          if (command === "ultimate") return "Ultimate";
+          if (command === "attack") return "Attack";
+          if (command === "block") return "Block";
+          return String(command || "");
+        }
+
         function combatKeyHintText() {
-          return `Q Attack | W Defence | E Block | R Skill`;
+          return `Q Attack | W Defense | E Block | R Ultimate`;
         }
 
         function micSlowTimeActive() {
@@ -896,7 +904,7 @@
         }
 
         function setVoiceDebug(command, result) {
-          state.parsedCommand = command ? command.toUpperCase() : "-";
+          state.parsedCommand = command ? commandDisplayName(command).toUpperCase() : "-";
           state.voiceResult = result;
         }
 
@@ -913,7 +921,7 @@
 
           if (!command) {
             setVoiceDebug(null, "Unknown");
-            state.message = "Voice unknown. Say Attack, Defence, Block, Ultimate, or Skill.";
+            state.message = "Voice unknown. Say Attack, Defense, Block, or Ultimate.";
             log("voice_tick_unknown", { transcript: latest.normalized });
             return { command: null, result: "Unknown" };
           }
@@ -983,8 +991,8 @@
           useCommand(command, "voice");
           setVoiceDebug(command, ready ? "Cast" : "Cooldown");
           state.note = ready
-            ? `Voice cast: ${command.toUpperCase()}`
-            : `Voice heard ${command.toUpperCase()}; cooldown ${state.cd[command].toFixed(1)}s`;
+            ? `Voice cast: ${commandDisplayName(command).toUpperCase()}`
+            : `Voice heard ${commandDisplayName(command).toUpperCase()}; cooldown ${state.cd[command].toFixed(1)}s`;
           log("voice_command_processed", { command, ready });
           return ready;
         }
@@ -1049,7 +1057,7 @@
           if (attack.target === "player") {
             state.playerHp = clamp(state.playerHp - damage, 0, core.getPlayerMaxHp(cfg, state));
             state.playerState = defended ? "Defended" : "Hit";
-            state.message = defended ? `Defence reduced damage. You -${damage} HP` : `Enemy hit. You -${damage} HP`;
+            state.message = defended ? `Defense reduced damage. You -${damage} HP` : `Enemy hit. You -${damage} HP`;
           } else {
             state.enemyHp = clamp(state.enemyHp - damage, 0, core.getEnemyStats(cfg, state).maxHp);
             state.enemyState = attack.command === "ultimate" ? "Crushed" : "Hit";
@@ -1075,11 +1083,11 @@
             return;
           }
 
-          state.accepted = cmd.toUpperCase();
+          state.accepted = commandDisplayName(cmd).toUpperCase();
           log("command", { cmd, source });
 
           if (state.cd[cmd] > 0) {
-            state.message = `${cmd.toUpperCase()} cooldown: ${state.cd[cmd].toFixed(1)}s`;
+            state.message = `${commandDisplayName(cmd).toUpperCase()} cooldown: ${state.cd[cmd].toFixed(1)}s`;
             state.playerState = "Cooldown";
             return;
           }
@@ -1097,8 +1105,8 @@
             const duration = core.modifiedDefenceDuration(cfg, state);
             state.cd.defence = core.getCommandCooldown(cfg, state, "defence");
             state.defenceTimer = duration;
-            state.playerState = "Defence";
-            state.message = `Defence shield active for ${duration.toFixed(1)} seconds`;
+            state.playerState = "Defense";
+            state.message = `Defense shield active for ${duration.toFixed(1)} seconds`;
             shield(cfg.battleLayout.playerDragon.hitX, cfg.battleLayout.playerDragon.hitY, "#60a5fa", 28);
           }
 
@@ -1287,8 +1295,8 @@
           const blockWasActive = state.blockTimer > 0;
           if (defenceWasActive) state.defenceTimer = Math.max(0, state.defenceTimer - dt);
           if (blockWasActive) state.blockTimer = Math.max(0, state.blockTimer - dt);
-          if (blockWasActive && state.blockTimer === 0 && state.defenceTimer > 0) state.playerState = "Defence";
-          if ((defenceWasActive || blockWasActive) && state.defenceTimer === 0 && state.blockTimer === 0 && ["Defence", "Defended", "Block", "Blocked"].includes(state.playerState)) {
+          if (blockWasActive && state.blockTimer === 0 && state.defenceTimer > 0) state.playerState = "Defense";
+          if ((defenceWasActive || blockWasActive) && state.defenceTimer === 0 && state.blockTimer === 0 && ["Defense", "Defended", "Block", "Blocked"].includes(state.playerState)) {
             state.playerState = "Ready";
           }
 
@@ -1442,7 +1450,7 @@
           const controls = cfg.battleLayout.controls;
           canvasButton("mic", controls.mic.x, controls.mic.y, controls.mic.w, controls.mic.h, micRequested ? "Stop Mic" : "Start Mic", listening ? "#164e35dd" : micRequested ? "#713f12dd" : "#f6c453dd", "#f6c453");
           drawCombatButton("attack", "Attack", controls.attack, "#402313dd", "#fb923c");
-          drawCombatButton("defence", "Defence", controls.defence, "#16324add", "#60a5fa");
+          drawCombatButton("defence", "Defense", controls.defence, "#16324add", "#60a5fa");
           drawCombatButton("block", "Block", controls.block, "#3b2b12dd", "#f6c453");
           drawCombatButton("ultimate", "Ultimate", controls.ultimate, "#30215bdd", "#a78bfa");
           canvasButton("pauseMatch", controls.pause.x, controls.pause.y, controls.pause.w, controls.pause.h, cfg.flow.labels.pause, "#102a4cdd", "#87d5ff");
@@ -1503,7 +1511,7 @@
           ctx.fillText("Choose Your Dragon", cfg.viewport.centerX, select.titleY);
           ctx.fillStyle = "#cbd5e1";
           ctx.font = "18px system-ui";
-          ctx.fillText("Each role changes Attack, Defence, or Skill timing in battle.", cfg.viewport.centerX, select.subtitleY);
+          ctx.fillText("Each role changes Attack, Defense, or Ultimate timing in battle.", cfg.viewport.centerX, select.subtitleY);
 
           cfg.dragons.forEach((dragon, index) => {
             const x = select.firstCardX + index * (select.cardW + select.cardGap);
@@ -1522,7 +1530,7 @@
             wrapText(dragon.flavor, x + select.cardW / 2, select.flavorY, select.cardW - 46, 18);
             ctx.fillStyle = "#bbf7d0";
             ctx.font = "bold 13px system-ui";
-            ctx.fillText(`ATK x${dragon.modifiers.attackDamage}  DEF x${dragon.modifiers.defenceDuration}  SKILL x${dragon.modifiers.skillCooldown}`, x + select.cardW / 2, select.statsY);
+            ctx.fillText(`ATK x${dragon.modifiers.attackDamage}  DEF x${dragon.modifiers.defenceDuration}  ULT x${dragon.modifiers.skillCooldown}`, x + select.cardW / 2, select.statsY);
           });
 
           const selectedDragon = core.getSelectedDragon(cfg, state);
@@ -1577,7 +1585,7 @@
               : upgradeId === "vitality"
                 ? `Max HP ${core.getPlayerMaxHp(cfg, state)} → ${core.getPlayerMaxHp(cfg, state) + cfg.progression.vitalityHpPerRank}`
                 : upgradeId === "guard"
-                  ? `Defence ${core.modifiedDefenceDuration(cfg, state).toFixed(1)}s`
+                  ? `Defense ${core.modifiedDefenceDuration(cfg, state).toFixed(1)}s`
                   : `Attack CD ${core.getCommandCooldown(cfg, state, "attack").toFixed(2)}s`;
             ctx.fillStyle = "#93c5fd";
             ctx.font = "bold 14px system-ui";
@@ -1892,7 +1900,7 @@
           ctx.textAlign = "center";
           ctx.font = "bold 15px system-ui";
           ctx.fillStyle = color;
-          ctx.fillText(`${blockActive ? "BLOCK" : "DEFENCE"} ${remaining.toFixed(1)}s`, layout.x, layout.y + layout.h * 0.58);
+          ctx.fillText(`${blockActive ? "BLOCK" : "DEFENSE"} ${remaining.toFixed(1)}s`, layout.x, layout.y + layout.h * 0.58);
           ctx.restore();
         }
 
@@ -2194,7 +2202,7 @@
                   queueVoiceTranscript(best.normalized, signature);
                   processVoiceTick(now);
                 } else if (!duplicate && state.phase === "playing") {
-                  state.message = "Not recognized. Say one full word: Attack, Defence, Block, Ultimate, or Skill.";
+                  state.message = "Not recognized. Say one full word: Attack, Defense, Block, or Ultimate.";
                 }
                 continue;
               }
@@ -2209,9 +2217,9 @@
                 lastVoiceCommand = { signature, at: now };
                 if (best?.commands.length && state.phase === "playing") {
                   voiceCommandQueue.push(...best.commands);
-                  state.note = `Queued: ${best.commands.map((command) => command.toUpperCase()).join(" → ")}`;
+                  state.note = `Queued: ${best.commands.map((command) => commandDisplayName(command).toUpperCase()).join(" → ")}`;
                 } else if (!best?.commands.length && state.phase === "playing") {
-                  state.message = "Not recognized. Say Attack, Defence, Block, Ultimate, or Skill.";
+                  state.message = "Not recognized. Say Attack, Defense, Block, or Ultimate.";
                 }
               }
             }
@@ -2293,7 +2301,7 @@
             state.selectedDragonId = button.id.slice("select:".length);
             const dragon = core.getSelectedDragon(cfg, state);
             state.message = `${dragon.name} selected.`;
-            state.note = `${dragon.role}: Attack x${dragon.modifiers.attackDamage}, Defence x${dragon.modifiers.defenceDuration}, Skill x${dragon.modifiers.skillCooldown}`;
+            state.note = `${dragon.role}: Attack x${dragon.modifiers.attackDamage}, Defense x${dragon.modifiers.defenceDuration}, Ultimate x${dragon.modifiers.skillCooldown}`;
           }
           if (button.id === "confirmDragon") confirmDragon();
           if (button.id === "mic") toggleMic();

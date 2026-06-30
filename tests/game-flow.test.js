@@ -391,11 +391,11 @@ test("voice command still works while mic disables manual controls", () => {
 
   assert.equal(result.command, "defence");
   assert.equal(result.cast, true);
-  assert.equal(app.state.accepted, "DEFENCE");
+  assert.equal(app.state.accepted, "DEFENSE");
   assert.ok(app.state.defenceTimer > 0);
 });
 
-test("Q W E R trigger Attack Defence Block and Skill", () => {
+test("Q W E R trigger Attack Defense Block and Ultimate", () => {
   const app = loadGame();
   startBattle(app);
 
@@ -404,7 +404,7 @@ test("Q W E R trigger Attack Defence Block and Skill", () => {
 
   app.state.cd.defence = 0;
   pressKey(app, "w");
-  assert.equal(app.state.accepted, "DEFENCE");
+  assert.equal(app.state.accepted, "DEFENSE");
 
   app.state.cd.block = 0;
   pressKey(app, "e");
@@ -420,7 +420,7 @@ test("Q W E R trigger Attack Defence Block and Skill", () => {
   assert.equal(app.commandFromKey("r"), "ultimate");
 });
 
-test("old combat keys no longer trigger skills", () => {
+test("old combat keys no longer trigger commands", () => {
   const app = loadGame();
   startBattle(app);
   app.state.cd.attack = 0;
