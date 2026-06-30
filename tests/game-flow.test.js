@@ -8,10 +8,19 @@ function loadGame() {
   const source = html.match(/<script>([\s\S]*?)<\/script>/)[1];
   const intervals = [];
   const keyHandlers = [];
+  const textCalls = [];
   const context2d = new Proxy({}, {
     get(target, property) {
       if (property === "createLinearGradient") return () => ({ addColorStop() {} });
       if (property === "measureText") return (value) => ({ width: String(value).length * 8 });
+      if (property === "fillText") {
+        if (!(property in target)) {
+          target[property] = (...args) => {
+            textCalls.push(args.map((value) => String(value)));
+          };
+        }
+        return target[property];
+      }
       if (!(property in target)) target[property] = () => {};
       return target[property];
     },
@@ -63,7 +72,7 @@ function loadGame() {
   };
   window.SpeechRecognition = SpeechRecognitionStub;
   vm.runInNewContext(source, context);
-  window.DragonFighter.__test = { context, intervals, keyHandlers };
+  window.DragonFighter.__test = { context, intervals, keyHandlers, textCalls };
   return window.DragonFighter;
 }
 
@@ -346,6 +355,41 @@ test("processVoiceTick processes valid transcript into one command", () => {
   assert.equal(app.gameplayMultiplier(), app.CONFIG.timerMultiplier);
 });
 
+test("voice phrase tries multiple commands in spoken order", () => {
+  const app = loadGame();
+  startBattle(app);
+  app.toggleMic();
+  app.state.cd.attack = 0;
+  app.state.cd.ultimate = 0;
+
+  app.queueVoiceTranscript("attack skill", "voice:multi");
+  const result = app.processVoiceTick(1000);
+
+  assert.deepEqual(result.commands, ["attack", "ultimate"]);
+  assert.equal(result.cast, true);
+  assert.equal(app.state.pendingAttacks.length, 2);
+  assert.equal(app.state.pendingAttacks[0].command, "attack");
+  assert.equal(app.state.pendingAttacks[1].command, "ultimate");
+  assert.equal(app.state.accepted, "ULTIMATE");
+});
+
+test("voice phrase still tries next command when earlier command is on cooldown", () => {
+  const app = loadGame();
+  startBattle(app);
+  app.toggleMic();
+  app.state.cd.attack = 2;
+  app.state.cd.ultimate = 0;
+
+  app.queueVoiceTranscript("attack skill", "voice:skip");
+  const result = app.processVoiceTick(1000);
+
+  assert.deepEqual(result.commands, ["attack", "ultimate"]);
+  assert.equal(result.cast, true);
+  assert.equal(app.state.pendingAttacks.length, 1);
+  assert.equal(app.state.pendingAttacks[0].command, "ultimate");
+  assert.equal(app.state.accepted, "ULTIMATE");
+});
+
 test("repeated speech attack attack triggers Attack only once", () => {
   const app = loadGame();
   startBattle(app);
@@ -361,6 +405,52 @@ test("repeated speech attack attack triggers Attack only once", () => {
   assert.equal(app.state.pendingAttacks.length, 1);
   assert.equal(app.state.voiceResult, "Cast");
   assert.equal(app.state.micListening, false);
+});
+
+test("voice attack uses the configured damage bonus while keyboard attack stays normal", () => {
+  const voiceApp = loadGame();
+  startBattle(voiceApp);
+  voiceApp.toggleMic();
+  voiceApp.state.cd.attack = 0;
+  voiceApp.queueVoiceTranscript("attack", "voice:bonus");
+  voiceApp.processVoiceTick(1000);
+
+  const keyboardApp = loadGame();
+  startBattle(keyboardApp);
+  keyboardApp.state.cd.attack = 0;
+  pressKey(keyboardApp, "q");
+
+  assert.equal(voiceApp.state.pendingAttacks[0].damage, Math.round(keyboardApp.state.pendingAttacks[0].damage * voiceApp.CONFIG.voiceAttackDamageMultiplier));
+});
+
+test("voice defense lasts longer than keyboard defense", () => {
+  const voiceApp = loadGame();
+  startBattle(voiceApp);
+  voiceApp.toggleMic();
+  voiceApp.state.cd.defence = 0;
+  voiceApp.queueVoiceTranscript("defence", "voice:defense-bonus");
+  voiceApp.processVoiceTick(1000);
+
+  const keyboardApp = loadGame();
+  startBattle(keyboardApp);
+  keyboardApp.state.cd.defence = 0;
+  pressKey(keyboardApp, "w");
+
+  assert.equal(voiceApp.state.defenceTimer, keyboardApp.state.defenceTimer * voiceApp.CONFIG.voiceDefenceDurationMultiplier);
+});
+
+test("mic listening text appears in canvas while listening and disappears after stop", () => {
+  const app = loadGame();
+  startBattle(app);
+  app.toggleMic();
+  app.__test.textCalls.length = 0;
+  app.draw();
+  assert.ok(app.__test.textCalls.some((call) => call[0] === app.CONFIG.micListeningText));
+
+  app.toggleMic();
+  app.__test.textCalls.length = 0;
+  app.draw();
+  assert.ok(!app.__test.textCalls.some((call) => call[0] === app.CONFIG.micListeningText));
 });
 
 test("processVoiceTick shows cooldown feedback for cooldown command", () => {

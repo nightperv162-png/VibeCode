@@ -66,6 +66,15 @@
           micSlowTimeMaxSeconds: 5,
           micSlowTimeFadeInSeconds: 0,
           micSlowTimeFadeOutSeconds: 0.2,
+          allowMultipleVoiceCommandsPerPhrase: true,
+          allowDuplicateCommandInSameVoicePhrase: false,
+          maxVoiceCommandsPerPhrase: 4,
+          enableVoiceCommandBonus: true,
+          voiceAttackDamageMultiplier: 1.5,
+          voiceSkillDamageMultiplier: 1.5,
+          voiceDefenceDurationMultiplier: 1.5,
+          voiceBlockDurationMultiplier: 1.5,
+          micListeningText: "Dragon is listening...",
           voice: {
             language: "en-US",
             scanIntervalMs: 500,
@@ -849,6 +858,26 @@
           return String(command || "");
         }
 
+        function formatVoiceCommandList(commands) {
+          const list = Array.isArray(commands) ? commands : [commands];
+          return list.map((command) => commandDisplayName(command).toUpperCase()).join(" -> ");
+        }
+
+        function normalizeVoiceCommands(commands) {
+          const list = Array.isArray(commands) ? commands : [commands];
+          const uniqueCommands = [];
+          const seen = new Set();
+          for (const command of list) {
+            if (!command) continue;
+            if (!cfg.allowDuplicateCommandInSameVoicePhrase && seen.has(command)) continue;
+            seen.add(command);
+            uniqueCommands.push(command);
+            if (!cfg.allowMultipleVoiceCommandsPerPhrase) break;
+            if (uniqueCommands.length >= cfg.maxVoiceCommandsPerPhrase) break;
+          }
+          return uniqueCommands;
+        }
+
         function combatKeyHintText() {
           return `Q Attack | W Defense | E Block | R Ultimate`;
         }
@@ -911,7 +940,8 @@
         }
 
         function setVoiceDebug(command, result) {
-          state.parsedCommand = command ? commandDisplayName(command).toUpperCase() : "-";
+          if (Array.isArray(command)) state.parsedCommand = command.length ? formatVoiceCommandList(command) : "-";
+          else state.parsedCommand = command ? commandDisplayName(command).toUpperCase() : "-";
           state.voiceResult = result;
         }
 
@@ -924,17 +954,17 @@
 
           const latest = queued[queued.length - 1];
           state.lastHeard = latest.normalized;
-          const command = Array.from(new Set(commandsFromSpeech(latest.normalized)))[0] || null;
+          const commands = normalizeVoiceCommands(commandsFromSpeech(latest.normalized));
 
-          if (!command) {
+          if (!commands.length) {
             setVoiceDebug(null, "Unknown");
             state.message = "Voice unknown. Say Attack, Defense, Block, or Ultimate.";
             log("voice_tick_unknown", { transcript: latest.normalized });
-            return { command: null, result: "Unknown" };
+            return { command: null, commands: [], result: "Unknown", cast: false };
           }
 
-          const cast = processRecognizedCommand(command, latest.signature, now);
-          return { command, result: state.voiceResult, cast };
+          const cast = processRecognizedCommand(commands, latest.signature, now);
+          return { command: commands[0], commands, result: state.voiceResult, cast };
         }
 
         function flushVoiceCommandQueue() {
@@ -945,8 +975,8 @@
           }
 
           commands.forEach((item) => {
-            const command = typeof item === "string" ? item : Array.from(new Set(commandsFromSpeech(item.normalized || item.transcript)))[0];
-            if (command) processRecognizedCommand(command, item.signature || command);
+            const commands = normalizeVoiceCommands(commandsFromSpeech(item.normalized || item.transcript));
+            if (commands.length) processRecognizedCommand(commands, item.signature || commands.join(":"));
           });
           if (commands.length) {
             state.note = "Voice window processed.";
@@ -970,42 +1000,47 @@
           return micRequested || state.paused;
         }
 
-        function processRecognizedCommand(command, signature = command, now = performance.now()) {
-          if (!command) {
+        function processRecognizedCommand(command, signature = Array.isArray(command) ? command.join(":") : command, now = performance.now()) {
+          const commands = normalizeVoiceCommands(command);
+          if (!commands.length) {
             setVoiceDebug(null, "Unknown");
             return false;
           }
           if (!micRequested) {
-            setVoiceDebug(command, "Inactive");
+            setVoiceDebug(commands, "Inactive");
             state.message = "Mic is off. Press Listen Command to use voice commands.";
             return false;
           }
           if (state.phase !== "playing" || state.paused) {
-            setVoiceDebug(command, "Inactive");
+            setVoiceDebug(commands, "Inactive");
             state.message = state.paused ? "Voice ignored while paused." : "Voice ignored outside battle.";
-            log("voice_inactive_ignored", { command, phase: state.phase, paused: state.paused });
+            log("voice_inactive_ignored", { commands, phase: state.phase, paused: state.paused });
             return false;
           }
           if (state.countdownTimer > 0) {
-            setVoiceDebug(command, "Inactive");
+            setVoiceDebug(commands, "Inactive");
             state.message = "Get ready. Voice commands start after countdown.";
-            log("voice_countdown_ignored", { command, countdownTimer: state.countdownTimer });
+            log("voice_countdown_ignored", { commands, countdownTimer: state.countdownTimer });
             return false;
           }
           const duplicate = signature === lastVoiceCommand.signature && now - lastVoiceCommand.at < cfg.voice.duplicateWindowMs;
           if (duplicate) {
-            setVoiceDebug(command, "Duplicate");
-            log("voice_duplicate_ignored", { command });
+            setVoiceDebug(commands, "Duplicate");
+            log("voice_duplicate_ignored", { commands });
             return false;
           }
           lastVoiceCommand = { signature, at: now };
-          const ready = state.cd[command] <= 0;
           const recognitionToStop = stopMicListening("command", { deferRecognitionStop: true });
-          useCommand(command, "voice");
-          setVoiceDebug(command, ready ? "Cast" : "Cooldown");
-          state.note = ready
-            ? `Voice cast: ${commandDisplayName(command).toUpperCase()}`
-            : `Voice heard ${commandDisplayName(command).toUpperCase()}; cooldown ${state.cd[command].toFixed(1)}s`;
+          const attempts = commands.map((item) => ({
+            command: item,
+            cast: useCommand(item, "voice")
+          }));
+          const anyCast = attempts.some((attempt) => attempt.cast);
+          const anyCooldown = attempts.some((attempt) => !attempt.cast);
+          setVoiceDebug(commands, anyCast ? "Cast" : anyCooldown ? "Cooldown" : "Unknown");
+          state.note = anyCast
+            ? `Voice tried: ${formatVoiceCommandList(commands)}`
+            : `Voice heard ${formatVoiceCommandList(commands)}; no command ready`;
           if (recognitionToStop?.stop) {
             try {
               recognitionToStop.stop();
@@ -1013,8 +1048,8 @@
               log("mic_stop_failed", { reason: "command", message: error.message });
             }
           }
-          log("voice_command_processed", { command, ready });
-          return ready;
+          log("voice_command_processed", { commands, attempts });
+          return anyCast;
         }
 
         function confirmDragon() {
@@ -1109,39 +1144,44 @@
             return;
           }
 
+          const voiceBonusEnabled = source === "voice" && cfg.enableVoiceCommandBonus;
+
           state.accepted = commandDisplayName(cmd).toUpperCase();
           log("command", { cmd, source });
 
           if (state.cd[cmd] > 0) {
             state.message = `${commandDisplayName(cmd).toUpperCase()} cooldown: ${state.cd[cmd].toFixed(1)}s`;
             state.playerState = "Cooldown";
-            return;
+            return false;
           }
 
           if (cmd === "attack") {
-            const damage = core.modifiedAttackDamage(cfg, state);
+            const damage = Math.round(core.modifiedAttackDamage(cfg, state) * (voiceBonusEnabled ? cfg.voiceAttackDamageMultiplier : 1));
             state.cd.attack = core.getCommandCooldown(cfg, state, "attack");
             state.playerState = "Attack Cast";
             state.enemyState = "Incoming";
             state.message = "Attack charging. Projectile incoming.";
             scheduleAttack("player", "enemy", "attack", damage, "#fb923c", 18);
+            return true;
           }
 
           if (cmd === "defence") {
-            const duration = core.modifiedDefenceDuration(cfg, state);
+            const duration = core.modifiedDefenceDuration(cfg, state) * (voiceBonusEnabled ? cfg.voiceDefenceDurationMultiplier : 1);
             state.cd.defence = core.getCommandCooldown(cfg, state, "defence");
             state.defenceTimer = duration;
             state.playerState = "Defense";
             state.message = `Defense shield active for ${duration.toFixed(1)} seconds`;
             shield(cfg.battleLayout.playerDragon.hitX, cfg.battleLayout.playerDragon.hitY, "#60a5fa", 28);
+            return true;
           }
 
           if (cmd === "block") {
             state.cd.block = core.getCommandCooldown(cfg, state, "block");
-            state.blockTimer = cfg.blockActiveTime;
+            state.blockTimer = cfg.blockActiveTime * (voiceBonusEnabled ? cfg.voiceBlockDurationMultiplier : 1);
             state.playerState = "Block";
-            state.message = `Block active for ${cfg.blockActiveTime.toFixed(1)} seconds`;
+            state.message = `Block active for ${state.blockTimer.toFixed(1)} seconds`;
             shield(cfg.battleLayout.playerDragon.hitX, cfg.battleLayout.playerDragon.hitY, "#f6c453", 18);
+            return true;
           }
 
           if (cmd === "ultimate") {
@@ -1149,8 +1189,11 @@
             state.playerState = "Ultimate Cast";
             state.enemyState = "Danger";
             state.message = "Ultimate charging. Heavy projectile incoming.";
-            scheduleAttack("player", "enemy", "ultimate", core.modifiedUltimateDamage(cfg, state), "#a78bfa", 32);
+            scheduleAttack("player", "enemy", "ultimate", Math.round(core.modifiedUltimateDamage(cfg, state) * (voiceBonusEnabled ? cfg.voiceSkillDamageMultiplier : 1)), "#a78bfa", 32);
+            return true;
           }
+
+          return false;
         }
 
         function startRecognition() {
@@ -1884,7 +1927,7 @@
           ctx.textAlign = "center";
           ctx.fillStyle = "#e0f2fe";
           ctx.font = "bold 18px system-ui";
-          ctx.fillText("Listening... Time slowed", cfg.viewport.centerX, 127);
+          ctx.fillText(cfg.micListeningText, cfg.viewport.centerX, 127);
           ctx.restore();
         }
 
@@ -2151,7 +2194,7 @@
 
           ctx.fillStyle = listening ? "#34d399" : micRequested ? "#f6c453" : "#fca5a5";
           ctx.font = "bold 16px system-ui";
-          ctx.fillText(micSlowTimeActive() ? "Listening... Time slowed" : listening ? "Listening for command" : micRequested ? "Preparing command listener" : "Command listener off", layout.mic.x, layout.mic.y);
+          ctx.fillText(micSlowTimeActive() ? cfg.micListeningText : listening ? cfg.micListeningText : micRequested ? "Preparing command listener" : "Command listener off", layout.mic.x, layout.mic.y);
 
           rr(layout.message.x, layout.message.y, layout.message.w, layout.message.h, 18, "#07101dd9", "#f6c45366");
           ctx.textAlign = "center";
@@ -2206,7 +2249,7 @@
             state.micSlowTimeElapsed = 0;
             speechError = "";
             startVoiceScanner();
-            state.note = state.phase === "playing" ? "Listening... Time slowed" : "Listening. Say one full command word in English.";
+            state.note = state.phase === "playing" ? cfg.micListeningText : "Listening. Say one full command word in English.";
             log("mic_start", { sessionId });
           };
 
