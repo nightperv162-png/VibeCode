@@ -2,23 +2,31 @@
 
 ## Stable Decisions
 
-- The active Dragon Fighter project lives in `dragon-fighter-prototype/dragon-fighter`.
-- The deployed/static game currently runs from the repository root `index.html`.
-- The root `index.html` is the single active Canvas game file and contains the active dragon config, combat modifier helpers, state, input, and renderer logic inline.
-- Milestone 1 is a static Canvas-only battle screen; no real command handling or combat is implemented yet.
-- All gameplay, timing, UI, render, logging, server, and build tunables are centralized in `src/config.js`.
-- HTML stays minimal: it contains only the Canvas, basic page sizing CSS, and the module script.
-- The initial state labels for both dragons are `Idle`.
-- Command vocabulary for the prototype is exactly `Attack`, `Defence`, `Block`, and `Skill`.
-- Milestone 1 now starts with a Canvas-only Dragon Select phase before the static arena.
-- Dragon Select has exactly three selectable dragons in the single-file static version: Ember, Tide, and Moss.
-- Milestone 2 uses one shared command path for keyboard and Canvas button inputs.
-- Dragon role modifiers affect combat in helper logic: Attack Focus boosts Attack and shortens Defence, Defence Focus extends Defence and weakens Attack, Balanced keeps base Attack/Defence with a small Skill cooldown bonus.
-- Milestone 3 phase flow is `dragon-select` -> `countdown` -> `active-match` -> `result`.
-- Restart keeps the selected dragon and resets HP, timer, cooldowns, labels, latest feedback, AI timers, and result state.
-- AI uses the same command path as the player, acts every 2 seconds during active match, prefers Attack when available, and may react defensively after player Skill.
-- Dragon images are now manifest-driven local placeholder assets under `public/assets/dragons`.
-- Dragon Mania Legends Wiki images are temporary private prototype placeholders only; they must be replaced before public release or deployment unless explicit permission/licensing is confirmed.
-- Image loading is handled by an asset store with config-controlled logs, and Canvas shape dragons remain as fallback if a bitmap is missing or fails.
-- Arena background art is loaded through the same manifest-driven asset store, with the generated Canvas arena kept as fallback.
-- Player and enemy battle render data carry opposite facing flags; renderer applies flipping only for visuals.
+- The active playable Dragon Fighter source is the repository-root `index.html`.
+- The nested `dragon-fighter-prototype/dragon-fighter` folder now mainly holds docs and runtime assets.
+- The game is intentionally single-file HTML/CSS/JavaScript with Canvas rendering and no build step.
+- All player-facing UI stays inside Canvas.
+- Deployment serves the repository root through GitHub Pages.
+- Runtime assets are loaded from `dragon-fighter-prototype/dragon-fighter/public/assets/` with Canvas fallbacks.
+- Current image assets are temporary prototype placeholders and must be replaced with licensed production-safe assets before public release.
+
+## Current Game Shape
+
+- Main phases: `menu`, `tutorial`, `select`, `playing`, `result`, and `upgrade`.
+- Player flow: Main Menu -> optional Tutorial -> Dragon Select -> 3 second Countdown -> Battle -> Result -> Upgrade or Retry.
+- Dragons: Ember, Tide, and Moss.
+- Commands: Attack, Defense, Block, and Ultimate.
+- Keyboard combat shortcuts: Q/W/E/R.
+- Voice command words: Attack, Defense, Block, and Ultimate. The hidden recognition alias `skill` still maps to Ultimate.
+- Mic UI labels are `Listen Command` and `Execute Command`.
+- Voice command handling uses a fresh recognition session for each mic activation, then stops mic listening before executing the recognized command.
+- While mic is listening during active battle, gameplay timers use `micSlowTimeMultiplier`.
+- The countdown does not advance match timer, AI timer, cooldowns, or combat timers.
+- Primary forward-action buttons use a dark green style with white text.
+
+## Validation Memory
+
+- The active automated suite is `tests/game-flow.test.js`.
+- Current test count: 33.
+- Main checks: `node --test tests/game-flow.test.js`, `git diff --check`, local static server check for `/index.html`.
+- In this shell, Node has recently been unavailable on PATH, so test execution may be blocked even though the test file is current.

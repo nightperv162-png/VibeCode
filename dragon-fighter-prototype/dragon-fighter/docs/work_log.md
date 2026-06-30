@@ -69,9 +69,9 @@
 
 - Inspected `docs/agent_state.md`, `docs/agent_rules_short.md`, last 30 lines of `docs/work_log.md`, the root static `index.html`, git history, and the current tracked tree.
 - Changed `index.html`, `src/gameCore.js`, `test/gameCore.test.js`, `scripts/build.js`, `scripts/serve.js`, `package.json`, `docs/project_memory.md`, `docs/agent_state.md`, and `docs/work_log.md`.
-- Added centralized config for exactly three selectable dragons using existing local assets: Ember Attack Focus, Tide Defence Focus, and Moss Balanced.
+- Added centralized config for exactly three selectable dragons using existing local assets: Ember Attack Focus, Tide Defense Focus, and Moss Balanced.
 - Displayed role, flavor, and modifiers on the Canvas-only Dragon Select screen.
-- Applied selected dragon Attack, Defence, and Skill cooldown modifiers through helper logic used by combat commands.
+- Applied selected dragon Attack, Defense, and Ultimate cooldown modifiers through helper logic used by combat commands.
 - Updated battle rendering to draw the selected player dragon and use opposite player/enemy facing flags.
 - `npm.cmd test` passed: 8 tests, 8 pass.
 - `npm.cmd run build` passed and generated `dist`.
@@ -137,7 +137,7 @@
 
 ### Combat Shortcut Remap
 
-- Reassigned combat keyboard shortcuts in root `index.html` to Q/W/E/R for Attack, Defence, Block, and Skill/Ultimate.
+- Reassigned combat keyboard shortcuts in root `index.html` to Q/W/E/R for Attack, Defense, Block, and Ultimate.
 - Added config-driven key lookup and updated tutorial, HUD, and microphone fallback/error hints.
 - Removed old A/D/B/U combat behavior from the input path while leaving navigation hotkeys unchanged.
 - Expanded `tests/game-flow.test.js` to 19 tests covering new keys, old key rejection, mic-active key disabling, and paused key disabling.
@@ -167,5 +167,55 @@
 - No closes the dialog and keeps the player on the current upgrade screen.
 - Yes proceeds with the existing Change Dragon flow.
 - Added test coverage for the confirmation flow.
-- `node --test tests/game-flow.test.js` passed: 21 tests, 21 pass.
+- `node --test tests/game-flow.test.js` passed for the then-current suite.
 - `git diff --check` passed.
+
+## 2026-06-29
+
+### Slide Summary Document
+
+- Reviewed the current GDD, TDD, plan, project memory, agent state, work log, and root `index.html`.
+- Added `docs/sumup.md` as a slide-ready project summary covering concept, flow, dragons, combat, inputs, progression, architecture, tests, constraints, and next steps.
+- Reflected the current implemented Q/W/E/R combat shortcuts from `index.html` and the latest work log.
+
+### Current Documentation Alignment
+
+- Reviewed current docs, `tests/game-flow.test.js`, and root `index.html` signals for tutorial, pause, voice, key mapping, confirmation, progression, and testing behavior.
+- Updated `docs/gdd.md`, `docs/tdd.md`, and `docs/plan.md` to remove stale A/D/B/U and six-test claims and add Main Menu, Tutorial, Q/W/E/R, Pause, Change Dragon confirmation, and Web Speech details.
+
+### Voice Combat Feedback And Balance
+
+- Read `docs/agent_state.md`, confirmed `docs/agent_brief.md` is missing, and reviewed the last 30 lines of `docs/work_log.md`.
+- Updated root `index.html` so combat command buttons show cooldown seconds directly and dim while cooling down or while mic mode disables manual combat input.
+- Made `processVoiceTick()` process queued transcripts, normalize speech, cast the first valid command once, report Unknown/Cooldown/Cast/Inactive/Duplicate voice results, and support repeated phrases such as "attack attack".
+- Added config-controlled voice assist with a 1.3 enemy timer multiplier while mic mode is active.
+- Added short voice debug UI for latest heard phrase, parsed command, and result.
+- Expanded `tests/game-flow.test.js` for voice tick processing, repeated speech, cooldown voice feedback, manual lockout, voice assist, and button cooldown display.
+- `git diff --check` passed; Node-based tests could not run because `node` is not available on PATH in this shell.
+- Python static server check returned HTTP 200 at `http://127.0.0.1:5174/index.html`.
+
+## 2026-06-30
+
+### Immediate Mic Slow-Time
+
+- Read current root `index.html`, `docs/agent_state.md`, and the last 30 lines of `docs/work_log.md`.
+- Replaced AI-only voice assist with top-level timer config: `timerMultiplier`, `micSlowTimeMultiplier`, `micSlowTimeMaxSeconds`, `micSlowTimeFadeInSeconds`, and `micSlowTimeFadeOutSeconds`.
+- Added `state.micListening` and immediate slow-time activation from `recognition.onstart`.
+- Updated gameplay dt so match time, cooldowns, AI timer, Defense/Block timers, Frenzy, and projectile timing use scaled dt while cosmetic particles use raw dt.
+- Stopped mic listening and slow-time on valid command recognition before executing the command, timeout, manual stop, pause/menu navigation, and mic errors.
+- Added Canvas slow-time tint and "Listening... Time slowed" text during active battle listening.
+- Expanded `tests/game-flow.test.js` for immediate slow-time, no-speech-before-slow-time, command cleanup, timeout cleanup, permission-failure cleanup, and scaled match/cooldown/AI timers.
+
+### Documentation Refresh After UI And Countdown Polish
+
+- Updated README, GDD, TDD, plan, slide summary, project memory, agent state, and agent rules to match the current root `index.html` implementation.
+- Documented the 3 second pre-match countdown, dark green primary buttons, larger centered button text, `Listen Command` / `Execute Command` mic labels, and the current voice command flow.
+- Updated old player-facing command wording to Defense/Ultimate while noting the hidden `skill` voice alias for compatibility.
+- Updated validation references to the then-current `tests/game-flow.test.js` suite.
+
+### Voice Repeat Session Smoothness
+
+- Updated voice activation so each `Listen Command` creates a fresh Web Speech recognition session instead of reusing the previous object.
+- Added session-scoped final-result signatures and ignored stale events from old sessions to improve second-and-later voice commands.
+- Removed an unreachable legacy final-result block from `recognition.onresult`.
+- Expanded `tests/game-flow.test.js` to 33 tests with coverage for fresh recognition sessions across consecutive voice commands.
