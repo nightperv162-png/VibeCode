@@ -59,7 +59,7 @@ Important flow functions include `playNow()`, `openTutorial()`, `completeTutoria
 
 ## Voice Input
 
-The Web Speech API is optional. When available, recognition uses `en-US`, continuous interim results, queued final transcripts, `processVoiceTick()` parsing, duplicate suppression, and a configured 0.5 second scan cadence.
+The Web Speech API is optional. When available, each `Listen Command` activation creates a fresh recognition session using `en-US`, continuous interim results, queued final transcripts, `processVoiceTick()` parsing, duplicate suppression, and a configured 0.5 second scan cadence.
 
 Manual combat controls are disabled while microphone input is active. Unsupported or denied microphone access leaves keyboard and Canvas controls usable.
 
@@ -82,7 +82,7 @@ Run:
 node --test tests/game-flow.test.js
 ```
 
-The current 32 tests cover Main Menu and Tutorial flow, result routing, retry and Main Menu reset behavior, Ultimate starting cooldown, voice config and tick processing, repeated speech, cooldown voice feedback, immediate mic slow-time, slow-time timeout/error cleanup, scaled match/cooldown/AI timers, pre-match countdown timing, mic/manual input lockout, Q/W/E/R mapping, old-key rejection, button cooldown labels, pause behavior, paused retry/reset, and Change Dragon confirmation.
+The current 33 tests cover Main Menu and Tutorial flow, result routing, retry and Main Menu reset behavior, Ultimate starting cooldown, voice config and tick processing, fresh mic sessions, repeated speech, cooldown voice feedback, immediate mic slow-time, slow-time timeout/error cleanup, scaled match/cooldown/AI timers, pre-match countdown timing, mic/manual input lockout, Q/W/E/R mapping, old-key rejection, button cooldown labels, pause behavior, paused retry/reset, and Change Dragon confirmation.
 
 Inline JavaScript can also be syntax-checked by extracting the script from `index.html` and running `node --check`. There is no build command.
 

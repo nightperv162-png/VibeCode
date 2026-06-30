@@ -211,4 +211,11 @@
 - Updated README, GDD, TDD, plan, slide summary, project memory, agent state, and agent rules to match the current root `index.html` implementation.
 - Documented the 3 second pre-match countdown, dark green primary buttons, larger centered button text, `Listen Command` / `Execute Command` mic labels, and the current voice command flow.
 - Updated old player-facing command wording to Defense/Ultimate while noting the hidden `skill` voice alias for compatibility.
-- Updated validation references to the current 32-test `tests/game-flow.test.js` suite.
+- Updated validation references to the then-current `tests/game-flow.test.js` suite.
+
+### Voice Repeat Session Smoothness
+
+- Updated voice activation so each `Listen Command` creates a fresh Web Speech recognition session instead of reusing the previous object.
+- Added session-scoped final-result signatures and ignored stale events from old sessions to improve second-and-later voice commands.
+- Removed an unreachable legacy final-result block from `recognition.onresult`.
+- Expanded `tests/game-flow.test.js` to 33 tests with coverage for fresh recognition sessions across consecutive voice commands.

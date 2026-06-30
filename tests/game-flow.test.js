@@ -210,19 +210,39 @@ test("Ultimate starts on its normal full cooldown for new and retried battles", 
 
 test("voice recognition is English and uses the configured 0.5s interval", () => {
   const app = loadGame();
-  const recognition = app.getRecognition();
 
   assert.equal(app.CONFIG.voice.language, "en-US");
-  assert.equal(recognition.lang, "en-US");
+  assert.equal(app.getRecognition(), null);
   app.completeTutorial();
   app.playNow();
   app.state.selectedDragonId = "ember";
   app.confirmDragon();
   app.toggleMic();
 
+  const recognition = app.getRecognition();
+  assert.equal(recognition.lang, "en-US");
   assert.equal(app.CONFIG.voice.scanIntervalSeconds, 0.5);
   assert.ok(app.__test.intervals.some((interval) => interval.ms === app.CONFIG.voice.scanIntervalMs));
   assert.equal(app.CONFIG.voice.scanIntervalMs, 500);
+});
+
+test("each mic activation uses a fresh recognition session for the next command", () => {
+  const app = loadGame();
+  startBattle(app);
+
+  app.toggleMic();
+  const firstRecognition = app.getRecognition();
+  app.state.cd.attack = 0;
+  assert.equal(app.processRecognizedCommand("attack", "session:attack", 1000), true);
+  assert.equal(app.getRecognition(), null);
+
+  app.toggleMic();
+  const secondRecognition = app.getRecognition();
+  app.state.cd.block = 0;
+  assert.notEqual(secondRecognition, firstRecognition);
+  assert.equal(app.processRecognizedCommand("block", "session:block", 2000), true);
+  assert.equal(app.state.accepted, "BLOCK");
+  assert.equal(app.getRecognition(), null);
 });
 
 test("valid full-word voice casts immediately when ready and cooldown blocks casting", () => {

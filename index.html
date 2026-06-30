@@ -497,6 +497,7 @@
         let speechError = "";
         let micStopReason = "";
         let lastVoiceCommand = { signature: "", at: 0 };
+        let voiceSessionId = 0;
         let last = performance.now();
 
         const rand = (a, b) => a + Math.random() * (b - a);
@@ -861,7 +862,7 @@
         }
 
         function stopMicListening(reason = "stop") {
-          const shouldStopRecognition = listening && recognition?.stop;
+          const shouldStopRecognition = Boolean(recognition?.stop) && (listening || micRequested);
           micStopReason = reason;
           micRequested = false;
           listening = false;
@@ -1143,7 +1144,8 @@
         }
 
         function startRecognition() {
-          if (!recognition || listening || !micRequested) return;
+          if (!SpeechRecognition || listening || !micRequested) return;
+          if (!recognition) createRecognitionSession();
 
           try {
             recognition.start();
@@ -1155,7 +1157,7 @@
         }
 
         function toggleMic() {
-          if (!recognition) {
+          if (!SpeechRecognition) {
             state.note = "This browser does not support Web Speech API. Use canvas buttons or Q/W/E/R.";
             return;
           }
@@ -1168,6 +1170,7 @@
 
           micRequested = true;
           speechError = "";
+          clearVoiceCommandQueue();
           startVoiceScanner();
           startRecognition();
         }
@@ -2167,29 +2170,37 @@
           requestAnimationFrame(loop);
         }
 
-        function setupSpeech() {
-          if (!SpeechRecognition) {
-            if (state.phase !== "tutorial") state.note = "This browser does not support Web Speech API. Use canvas buttons or Q/W/E/R.";
-            return;
-          }
+        function createRecognitionSession() {
+          const session = new SpeechRecognition();
+          const sessionId = voiceSessionId + 1;
+          voiceSessionId = sessionId;
+          recognition = session;
+          session.lang = cfg.voice.language;
+          session.continuous = true;
+          session.interimResults = true;
+          session.maxAlternatives = 3;
 
-          recognition = new SpeechRecognition();
-          recognition.lang = cfg.voice.language;
-          recognition.continuous = true;
-          recognition.interimResults = true;
-          recognition.maxAlternatives = 3;
-
-          recognition.onstart = () => {
+          session.onstart = () => {
+            if (recognition !== session) return;
+            if (!micRequested) {
+              try {
+                session.stop();
+              } catch (error) {
+                log("mic_late_start_stop_failed", { sessionId, message: error.message });
+              }
+              return;
+            }
             listening = true;
             state.micListening = true;
             state.micSlowTimeElapsed = 0;
             speechError = "";
             startVoiceScanner();
             state.note = state.phase === "playing" ? "Listening... Time slowed" : "Listening. Say one full command word in English.";
-            log("mic_start");
+            log("mic_start", { sessionId });
           };
 
-          recognition.onend = () => {
+          session.onend = () => {
+            if (recognition !== session) return;
             const reason = micStopReason;
             listening = false;
             state.micListening = false;
@@ -2200,10 +2211,12 @@
               state.note = "Mic is off. Press Listen Command to listen again.";
             }
             micStopReason = "";
-            log("mic_end");
+            recognition = null;
+            log("mic_end", { sessionId });
           };
 
-          recognition.onerror = (e) => {
+          session.onerror = (e) => {
+            if (recognition !== session) return;
             speechError = e.error === "no-speech"
               ? "No speech heard. Time restored."
               : e.error === "aborted" && !micRequested
@@ -2211,11 +2224,11 @@
                 : `Mic error: ${e.error}. Use canvas buttons or Q/W/E/R.`;
             stopMicListening(`error:${e.error}`);
             state.note = speechError;
-            log("mic_error", { error: e.error });
+            log("mic_error", { error: e.error, sessionId });
           };
 
-          recognition.onresult = (e) => {
-            if (!micRequested) return;
+          session.onresult = (e) => {
+            if (recognition !== session || !micRequested) return;
 
             for (let i = e.resultIndex; i < e.results.length; i += 1) {
               const alternatives = Array.from(e.results[i]).map((alternative) => ({
@@ -2236,7 +2249,7 @@
 
               if (e.results[i].isFinal) {
                 const now = performance.now();
-                const signature = `${best?.normalized || "unknown"}:${i}`;
+                const signature = `${sessionId}:${best?.normalized || "unknown"}:${i}`;
                 const duplicate = signature === lastVoiceCommand.signature && now - lastVoiceCommand.at < cfg.voice.duplicateWindowMs;
                 log("speech_final", { alternatives, commands: best?.commands || [], duplicate });
 
@@ -2248,24 +2261,17 @@
                 }
                 continue;
               }
-
-              if (e.results[i].isFinal) {
-                const now = performance.now();
-                const signature = `${best?.commands.join(",") || "unknown"}:${best?.normalized || ""}`;
-                const duplicate = signature === lastVoiceCommand.signature && now - lastVoiceCommand.at < cfg.voice.duplicateWindowMs;
-                log("speech_final", { alternatives, commands: best?.commands || [], duplicate });
-
-                if (duplicate) continue;
-                lastVoiceCommand = { signature, at: now };
-                if (best?.commands.length && state.phase === "playing") {
-                  voiceCommandQueue.push(...best.commands);
-                  state.note = `Queued: ${best.commands.map((command) => commandDisplayName(command).toUpperCase()).join(" → ")}`;
-                } else if (!best?.commands.length && state.phase === "playing") {
-                  state.message = "Not recognized. Say Attack, Defense, Block, or Ultimate.";
-                }
-              }
             }
           };
+
+          return session;
+        }
+
+        function setupSpeech() {
+          if (!SpeechRecognition) {
+            if (state.phase !== "tutorial") state.note = "This browser does not support Web Speech API. Use canvas buttons or Q/W/E/R.";
+            return;
+          }
 
           if (state.phase !== "tutorial") state.note = "Voice is supported. Say one full English command word.";
         }

@@ -19,7 +19,7 @@
 - Keyboard combat shortcuts: Q/W/E/R.
 - Voice command words: Attack, Defense, Block, and Ultimate. The hidden recognition alias `skill` still maps to Ultimate.
 - Mic UI labels are `Listen Command` and `Execute Command`.
-- Voice command handling stops mic listening before executing the recognized command.
+- Voice command handling uses a fresh recognition session for each mic activation, then stops mic listening before executing the recognized command.
 - While mic is listening during active battle, gameplay timers use `micSlowTimeMultiplier`.
 - The countdown does not advance match timer, AI timer, cooldowns, or combat timers.
 - Primary forward-action buttons use a dark green style with white text.
@@ -27,6 +27,6 @@
 ## Validation Memory
 
 - The active automated suite is `tests/game-flow.test.js`.
-- Current test count: 32.
+- Current test count: 33.
 - Main checks: `node --test tests/game-flow.test.js`, `git diff --check`, local static server check for `/index.html`.
 - In this shell, Node has recently been unavailable on PATH, so test execution may be blocked even though the test file is current.

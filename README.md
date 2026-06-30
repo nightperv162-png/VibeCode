@@ -10,7 +10,7 @@ The playable game lives at the repository root in `index.html`. There is no buil
 - Three dragons: Ember, Tide, and Moss.
 - Commands: Attack, Defense, Block, and Ultimate.
 - Inputs: voice, Q/W/E/R keyboard shortcuts, and Canvas buttons.
-- Voice flow: press `Listen Command`, speak one command, then the game stops listening and executes that command.
+- Voice flow: press `Listen Command`, speak one command, then the game stops listening and executes that command. Each activation starts a fresh speech-recognition session.
 - Battles include a 3 second pre-match countdown before the match timer, cooldowns, and AI timer start.
 - Mic listening slows gameplay time during battle until a command, timeout, manual stop, or mic error.
 
