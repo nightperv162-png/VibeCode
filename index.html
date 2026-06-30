@@ -282,7 +282,7 @@
             commandReference: { x: 505, y: 474, w: 390, h: 58 },
             enemyCommand: { x: 982, y: 474, w: 390, h: 58 },
             controls: {
-              mic: { x: 122, y: 548, w: 132, h: 44 },
+              mic: { x: 108, y: 548, w: 160, h: 44 },
               attack: { x: 421, y: 548, w: 108, h: 44 },
               defence: { x: 571, y: 548, w: 108, h: 44 },
               block: { x: 721, y: 548, w: 108, h: 44 },
@@ -861,8 +861,10 @@
           return cfg.timerMultiplier * (micSlowTimeActive() ? cfg.micSlowTimeMultiplier : 1);
         }
 
-        function stopMicListening(reason = "stop") {
+        function stopMicListening(reason = "stop", options = {}) {
+          const { deferRecognitionStop = false } = options;
           const shouldStopRecognition = Boolean(recognition?.stop) && (listening || micRequested);
+          const recognitionToStop = shouldStopRecognition ? recognition : null;
           micStopReason = reason;
           micRequested = false;
           listening = false;
@@ -870,7 +872,7 @@
           state.micSlowTimeElapsed = 0;
           clearTimeout(recognitionRestartTimer);
           stopVoiceScanner();
-          if (shouldStopRecognition) {
+          if (shouldStopRecognition && !deferRecognitionStop) {
             try {
               recognition.stop();
             } catch (error) {
@@ -878,6 +880,7 @@
             }
           }
           log("mic_stop", { reason });
+          return recognitionToStop;
         }
 
         function updateMicSlowTime(rawDt) {
@@ -997,12 +1000,19 @@
           }
           lastVoiceCommand = { signature, at: now };
           const ready = state.cd[command] <= 0;
-          stopMicListening("command");
+          const recognitionToStop = stopMicListening("command", { deferRecognitionStop: true });
           useCommand(command, "voice");
           setVoiceDebug(command, ready ? "Cast" : "Cooldown");
           state.note = ready
             ? `Voice cast: ${commandDisplayName(command).toUpperCase()}`
             : `Voice heard ${commandDisplayName(command).toUpperCase()}; cooldown ${state.cd[command].toFixed(1)}s`;
+          if (recognitionToStop?.stop) {
+            try {
+              recognitionToStop.stop();
+            } catch (error) {
+              log("mic_stop_failed", { reason: "command", message: error.message });
+            }
+          }
           log("voice_command_processed", { command, ready });
           return ready;
         }
@@ -1385,7 +1395,8 @@
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillStyle = disabled ? "#94a3b8" : "#ffffff";
-          ctx.font = sublabel ? "bold 15px system-ui" : "bold 17px system-ui";
+          const buttonFont = id === "mic" && !sublabel ? "bold 13px system-ui" : sublabel ? "bold 15px system-ui" : "bold 17px system-ui";
+          ctx.font = buttonFont;
           ctx.fillText(label, x + w / 2, y + h / 2 + (sublabel ? -7 : 0));
           if (sublabel) {
             ctx.fillStyle = disabled ? "#cbd5e1" : "#f6c453";
