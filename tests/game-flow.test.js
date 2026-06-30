@@ -767,8 +767,8 @@ test("successful mic command reduces other cooldowns but not its own", () => {
   assert.equal(result.cast, true);
   assert.equal(app.state.cd.attack, app.core.getCommandCooldown(app.CONFIG, app.state, "attack"));
   assert.equal(app.state.cd.defence, 4 - app.core.getCommandCooldown(app.CONFIG, app.state, "defence") * app.CONFIG.micCooldownReductionPercent);
-  assert.equal(app.state.cd.block, 0);
-  assert.equal(app.state.cd.ultimate, 6);
+  assert.equal(app.state.cd.block, 0.5);
+  assert.equal(app.state.cd.ultimate, 7);
 });
 
 test("keyboard and canvas commands do not reduce cooldowns or touch voice queue", () => {
